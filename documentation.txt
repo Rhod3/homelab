@@ -1,0 +1,439 @@
+# Homelab Setup
+
+## Overview
+
+The goal is to start with a simple, low-cost setup and progressively evolve it
+into a more capable homelab.
+
+The current priority is to get Home Assistant and other services running reliably
+without investing heavily in networking or additional hardware.
+
+The long-term architecture separates:
+- Compute → HP Elite Mini 600 G9
+- Storage → Synology DS420+
+- Virtualization → Proxmox
+- Networking → initially Gigabit, eventually managed 2.5/10 GbE
+- Smart home → Home Assistant OS
+
+
+# 1. Hardware
+
+## 1.1 Compute
+
+### Current
+
+**HP Elite Mini 600 G9**
+- CPU: Intel Core i7-12700T
+- RAM: 32 GB DDR5
+- Storage: 256 GB NVMe SSD
+- Integrated GPU: Intel UHD Graphics 770
+- Hypervisor: Proxmox VE
+
+Purpose:
+- Run virtual machines and containers
+- Home Assistant
+- Jellyfin
+- Other homelab services
+
+### Future
+
+Potential upgrades:
+- Upgrade NVMe storage to 1 TB or larger
+- Add a second NVMe drive if required
+- Upgrade RAM to 64 GB if the number of services grows
+- Use Intel UHD 770 / Quick Sync for Jellyfin hardware transcoding
+- Potentially add additional compute nodes if the homelab grows
+
+
+## 1.2 NAS / Storage
+
+### Current
+
+**Synology DS420+**
+- Main storage server
+- Existing 6 TB volume
+- Currently contains media
+- Also hosts the Home Assistant VM temporarily through Synology Virtual Machine Manager
+
+Primary data:
+- Movies
+- TV shows
+- Other media
+- Home Assistant backups
+
+### Future
+
+The Synology will primarily become the homelab's:
+- Bulk storage
+- Media storage
+- Backup destination
+- Network storage
+
+Potential future uses:
+- Proxmox backup storage
+- Home Assistant backup storage
+- Jellyfin media storage
+- Other application data
+
+The Home Assistant VM will eventually be migrated from the Synology
+to the HP/Proxmox host.
+
+
+## 1.3 Networking
+
+### Current
+
+**Existing router**
+- ASUS RT-AC2300
+
+**Switch**
+- 8-port Gigabit Ethernet switch
+- Initially unmanaged
+- Low-cost solution
+
+Purpose:
+- Connect HP Mini
+- Connect Synology
+- Connect existing computers/devices
+- Connect other homelab equipment
+
+Initial topology:
+
+    Internet
+       |
+       v
+    ASUS Router
+       |
+       v
+    8-port Gigabit Switch
+       |
+       +-- HP Elite Mini 600 G9
+       |
+       +-- Synology DS420+
+       |
+       +-- PC / other devices
+       |
+       +-- spare ports
+
+
+### Future
+
+Upgrade networking when there is a real need for it.
+
+Potential future setup:
+- Managed switch
+- 2.5 GbE
+- 10 GbE uplinks
+- VLAN support
+- PoE
+- Dedicated firewall/router
+- UniFi ecosystem
+
+Possible VLAN structure:
+
+    VLAN 10 - Management
+        Proxmox
+        Synology
+        Network equipment
+
+    VLAN 20 - Servers
+        Jellyfin
+        Docker
+        Other services
+
+    VLAN 30 - IoT
+        Smart home devices
+
+    VLAN 40 - Trusted
+        PCs
+        Phones
+        Personal devices
+
+    VLAN 50 - Guest
+        Guest Wi-Fi
+
+PoE could eventually be used for:
+- Wi-Fi access points
+- IP cameras
+- Raspberry Pi / small network devices
+
+UniFi is a potential future ecosystem for:
+- Gateway/router
+- Managed switches
+- Wi-Fi access points
+- VLAN management
+- Network monitoring
+
+
+## 1.4 Power
+
+### Current
+
+- Normal mains power
+- No dedicated UPS yet
+
+### Future
+
+Add a UPS protecting:
+- Synology DS420+
+- HP Elite Mini 600 G9
+- Network switch
+- Router
+
+Goal:
+- Protect against short power outages
+- Allow clean shutdown
+- Keep Home Assistant and network services available during brief outages
+
+
+# 2. Services
+
+## 2.1 Proxmox
+
+### Current
+
+**Proxmox VE**
+- Installed on HP Elite Mini 600 G9
+- Main virtualization platform
+- Will host Home Assistant and other services
+
+Initial approach:
+- Keep the number of VMs/containers relatively small
+- Use VMs where isolation or a dedicated OS is useful
+- Use LXC containers where appropriate
+
+### Future
+
+Proxmox becomes the central compute platform for the homelab.
+
+Potential services:
+
+    Proxmox
+    |
+    +-- Home Assistant OS VM
+    |
+    +-- Jellyfin
+    |
+    +-- Docker / container VM
+    |
+    +-- Other VMs
+    |
+    +-- Other LXC containers
+
+
+## 2.2 Home Assistant
+
+### Current
+
+**Home Assistant OS**
+- Running as a VM
+- Currently hosted on the Synology DS420+
+- Managed by Synology Virtual Machine Manager
+
+VM target configuration:
+- 2 vCPU
+- 4 GB RAM
+- ~32 GB virtual disk
+- Network connected through the default VM network
+- UEFI
+- Automatic startup enabled
+
+Home Assistant OS is preferred because it provides:
+- Home Assistant Supervisor
+- Add-on Store
+- Built-in backup system
+- Easy updates
+- Simple migration
+
+
+### Future
+
+Migrate Home Assistant OS from:
+
+    Synology VMM
+        |
+        v
+    Proxmox VM
+
+Migration method:
+1. Create a full Home Assistant backup
+2. Install Home Assistant OS VM on Proxmox
+3. Restore the backup
+4. Reconnect any USB hardware if necessary
+
+Home Assistant should remain independent from the bulk storage system.
+
+
+## 2.3 Home Assistant Backups
+
+### Current
+
+Use Home Assistant's built-in backup system.
+
+Backups should be:
+- Full backups
+- Automatic
+- Stored on the Synology
+
+A dedicated Synology shared folder should be used:
+
+    HomeAssistantBackups
+
+A dedicated Synology user can be created for this purpose:
+
+    ha-backup
+
+The user should only have access to the backup share.
+
+### Future
+
+Use a layered backup strategy:
+
+    Home Assistant
+          |
+          v
+    Automatic HA backup
+          |
+          v
+    Synology backup share
+          |
+          v
+    Hyper Backup
+          |
+          +-- External USB
+          +-- Another NAS
+          +-- Cloud storage
+
+Important:
+Hyper Backup should back up the Home Assistant backup files rather than
+the entire Home Assistant VM whenever possible.
+
+The goal is to have an application-level Home Assistant backup that can
+easily be restored to a future Proxmox installation.
+
+
+## 2.4 Jellyfin
+
+### Current
+
+Not yet deployed.
+
+### Future
+
+**Jellyfin** will run on the HP/Proxmox system.
+
+Expected architecture:
+
+    Jellyfin
+       |
+       v
+    Synology DS420+
+       |
+       +-- Movies
+       +-- TV Shows
+       +-- Other media
+
+The Intel UHD 770 / Quick Sync GPU should be used for hardware
+video transcoding.
+
+The exact Proxmox deployment method (LXC vs VM) will be decided later.
+
+
+## 2.5 Other Services
+
+### Current
+
+No additional services deployed yet.
+
+### Future
+
+Potential services include:
+
+- Docker
+- MQTT
+- Zigbee2MQTT
+- AdGuard Home / Pi-hole
+- Immich
+- Paperless-ngx
+- Monitoring
+- Other self-hosted applications
+
+Services should be added progressively rather than deploying everything
+at once.
+
+
+# 3. Storage Strategy
+
+## Current
+
+Synology DS420+:
+- 6 TB existing volume
+- Media stored on the volume
+- Home Assistant VM currently stored on the same volume
+
+This is acceptable for the initial setup.
+
+No separate storage volume is currently required just for Home Assistant.
+
+
+## Future
+
+Separate storage responsibilities:
+
+    HP Elite Mini 600 G9
+        |
+        +-- Proxmox
+        +-- VM/LXC disks
+        +-- Application runtime data
+
+    Synology DS420+
+        |
+        +-- Movies
+        +-- TV
+        +-- Photos
+        +-- Large application data
+        +-- Backups
+
+Potentially upgrade the HP's 256 GB SSD to:
+- 1 TB
+- 2 TB+
+
+This should provide substantially more room for VMs, containers,
+databases, logs and Proxmox snapshots.
+
+
+# 4. Long-Term Architecture
+
+The intended architecture is:
+
+                         Internet
+                            |
+                     Router / Firewall
+                            |
+                     Managed Switch
+                            |
+              +-------------+-------------+
+              |             |             |
+              v             v             v
+         HP Mini       Synology       Wi-Fi AP
+         Proxmox        DS420+
+              |
+       +------+------+------+
+       |      |      |      |
+       v      v      v      v
+      HA   Jellyfin Docker Other
+      OS             VM     VMs/LXC
+
+
+## Design principles
+
+1. Keep the initial setup simple.
+2. Avoid buying hardware before it is needed.
+3. Use the Synology primarily for storage and backups.
+4. Use the HP Mini primarily for compute.
+5. Use Proxmox as the central virtualization layer.
+6. Use Home Assistant OS rather than Home Assistant Container.
+7. Introduce VLANs when the network becomes complex enough to benefit from them.
+8. Upgrade to 2.5/10 GbE when Gigabit becomes a limitation.
+9. Maintain independent backups of important services.
+10. Keep migration to future hardware straightforward.
