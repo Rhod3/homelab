@@ -1,0 +1,62 @@
+# Homelab Architecture
+
+This document describes the current architecture and long-term vision for the homelab.
+
+---
+
+## Overview
+
+The setup starts with low-cost components and evolves over time. The primary objective is to maintain reliable core services (such as Home Assistant) while separating compute and storage duties.
+
+### Component Roles
+
+| Component | Hardware | Role |
+| --- | --- | --- |
+| **Compute** | HP Elite Mini 600 G9 | Hypervisor (Proxmox VE) for VMs & LXC containers |
+| **Storage** | Synology DS420+ | Bulk media storage, backups, network storage |
+| **Virtualization** | Proxmox VE | Central virtualization platform on HP Mini |
+| **Networking** | ASUS RT-AC2300 + 8-port Switch | Initially Gigabit, transitioning to managed 2.5/10 GbE |
+| **Smart Home** | Home Assistant OS | Virtual machine running Home Assistant OS |
+
+---
+
+## Target Long-Term Architecture
+
+```mermaid
+flowchart TD
+    Internet[Internet] --> Router[Router / Firewall]
+    Router --> Switch[Managed Switch]
+    Switch --> HP[HP Elite Mini 600 G9<br/>Proxmox VE]
+    Switch --> Synology[Synology DS420+<br/>Storage & Backups]
+    Switch --> AP[Wi-Fi Access Points]
+
+    subgraph Proxmox Compute Cluster / Host
+        HP --> HA[Home Assistant OS VM]
+        HP --> Jellyfin[Jellyfin LXC/VM]
+        HP --> Docker[Docker VM]
+        HP --> Other[Other VMs / LXCs]
+    end
+
+    subgraph Synology Storage Shares
+        Synology --> Media[Movies / TV / Media]
+        Synology --> HABackups[HomeAssistantBackups Share]
+    end
+
+    Jellyfin -. Mount NFS/SMB .-> Media
+    HA -. Auto Backup .-> HABackups
+```
+
+---
+
+## Design Principles
+
+1. **Keep the initial setup simple.**
+2. **Avoid buying hardware before it is needed.**
+3. **Use the Synology primarily for storage and backups.**
+4. **Use the HP Mini primarily for compute.**
+5. **Use Proxmox as the central virtualization layer.**
+6. **Use Home Assistant OS rather than Home Assistant Container.**
+7. **Introduce VLANs when network complexity requires isolation.**
+8. **Upgrade to 2.5/10 GbE when Gigabit network speeds become a bottleneck.**
+9. **Maintain independent backups of important services.**
+10. **Ensure hardware migration remains straightforward.**
