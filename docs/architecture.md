@@ -50,13 +50,4 @@ flowchart TD
 
 ## Design Principles
 
-1. **Keep the initial setup simple.**
-2. **Avoid buying hardware before it is needed.**
-3. **Use the Synology primarily for storage and backups.**
-4. **Use the HP Mini primarily for compute.**
-5. **Use Proxmox as the central virtualization layer.**
-6. **Use Home Assistant OS rather than Home Assistant Container.**
-7. **Introduce VLANs when network complexity requires isolation.**
-8. **Upgrade to 2.5/10 GbE when Gigabit network speeds become a bottleneck.**
-9. **Maintain independent backups of important services.**
-10. **Ensure hardware migration remains straightforward.**
+See [AGENTS.md](../AGENTS.md#guiding-principles) for the canonical list of guiding principles.
