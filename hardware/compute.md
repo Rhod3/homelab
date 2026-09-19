@@ -11,7 +11,7 @@ The HP Elite Mini 600 G9 serves as the primary compute node for the homelab, run
 | **Model** | HP Elite Mini 600 G9 |
 | **CPU** | Intel Core i7-12700T (12 Cores / 20 Threads) |
 | **RAM** | 32 GB DDR5 |
-| **Storage** | 256 GB NVMe SSD |
+| **Storage** | 256 GB NVMe SSD (primary, OS/boot) + 512 GB SSD (secondary, second M.2 port) |
 | **iGPU** | Intel UHD Graphics 770 (Quick Sync Video support) |
 | **Hypervisor** | Proxmox VE |
 
@@ -28,7 +28,7 @@ The HP Elite Mini 600 G9 serves as the primary compute node for the homelab, run
 
 ## Future Upgrade Roadmap
 
-- [ ] **Storage Upgrade**: Replace or add a 1 TB+ NVMe SSD to accommodate more virtual disk space.
+- [x] **Storage Upgrade**: Added a 512 GB SSD in the second M.2 port for additional virtual disk space.
 - [ ] **Memory Upgrade**: Upgrade RAM to 64 GB DDR5 as service density increases.
 - [ ] **Hardware Transcoding**: Pass through Intel UHD Graphics 770 / Quick Sync to Jellyfin for efficient hardware video encoding/decoding.
 - [ ] **Additional Nodes**: Consider adding secondary compute nodes for high-availability Proxmox clustering if needed.

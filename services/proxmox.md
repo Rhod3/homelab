@@ -6,7 +6,7 @@ Proxmox Virtual Environment (VE) serves as the core compute virtualization platf
 
 ## Configuration Summary
 
-- **Host Hardware**: HP Elite Mini 600 G9 (Intel i7-12700T, 32 GB RAM, 256 GB NVMe)
+- **Host Hardware**: HP Elite Mini 600 G9 — see [hardware/compute.md](../hardware/compute.md) for full specs
 - **Deployment Strategy**:
   - **Virtual Machines (VMs)**: Used for workloads requiring dedicated OS kernels, full isolation, or specialized OS bundles (e.g. Home Assistant OS).
   - **LXC Containers**: Used for lightweight applications sharing the host Linux kernel (e.g. Jellyfin, utility services).
