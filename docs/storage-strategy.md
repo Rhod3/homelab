@@ -52,3 +52,39 @@ flowchart TD
 - **Synology Shared Folder**: Store backups in a dedicated share named `HomeAssistantBackups`.
 - **Synology Dedicated User**: Access restricted to a dedicated user `ha-backup`.
 - **Secondary Backup (Hyper Backup)**: Back up the `.tar` backup files from Synology to external media or offsite cloud storage. Do *not* rely solely on VM image snapshots.
+
+---
+
+## General VM/LXC Backup Strategy
+
+Home Assistant's backup approach above is deliberately different from a generic VM backup: it is application-level and portable, which matters because Home Assistant is safety-relevant. Other services don't share that constraint, so they follow a staged approach instead.
+
+### Baseline: Proxmox vzdump
+
+Until a service has a proven need for something better, every VM/LXC other than Home Assistant is protected by Proxmox's built-in `vzdump`, scheduled and targeted at a Synology share.
+
+```mermaid
+flowchart TD
+    VMs[Proxmox VMs / LXCs<br/>Jellyfin, Docker VM, etc.] -->|Scheduled vzdump| VZDump[vzdump Backup Files]
+    VZDump -->|Store via NFS/SMB| SynologyShare[Synology 'ProxmoxBackups' Share]
+    SynologyShare -->|Hyper Backup| Dest[Hyper Backup Target]
+    Dest --> USB[External USB Drive]
+    Dest --> Offsite[Cloud / Remote NAS]
+```
+
+- **Scope**: whole VM/LXC disk and config snapshot. Crash-consistent, not application-consistent.
+- **Target**: dedicated `ProxmoxBackups` share on the Synology DS420+, separate from `HomeAssistantBackups`.
+- **Secondary backup**: reuse the existing Hyper Backup path to external/offsite storage rather than introducing a second mechanism.
+
+### Upgrading to App-Level Backups
+
+`vzdump` is a safety net, not the end state. As each planned service is actually deployed, evaluate whether it warrants an app-level backup instead of, or alongside, `vzdump`, based on what the application supports:
+
+| Service | Native Backup Support | Recommended Approach |
+| --- | --- | --- |
+| **Paperless-ngx** | `document_exporter` / `document_importer` (full portable export) | App-level export, same pattern as Home Assistant |
+| **Immich** | `pg_dump` / `pg_dumpall` for metadata only | DB dump plus filesystem sync of the library folder |
+| **Jellyfin** | No native export; media already lives on the NAS | Periodic copy of the config/DB directory only |
+| **Docker VM, MQTT, AdGuard Home, etc.** | No native export | `vzdump` baseline is sufficient |
+
+This table is not a commitment to build these integrations now. It exists so that when a service moves from "Planned" to "Deployed" in [services/README.md](../services/README.md), its backup method is a deliberate choice rather than an afterthought.
