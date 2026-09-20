@@ -21,17 +21,19 @@ flowchart LR
         Volume --> Media[Movies, TV Shows, Photos]
         Volume --> LargeData[Large Application Storage]
         Volume --> Backups[Service & HA Backups]
+        Volume --> Templates[Proxmox ISO Images & LXC Templates]
     end
 ```
 
 ### 1. Compute Node (HP Elite Mini 600 G9)
 - **Capacity**: see [hardware/compute.md](../hardware/compute.md) for drive models and sizes.
 - **Purpose**: Primary NVMe hosts the Proxmox OS, system logs, and Proxmox snapshots. Secondary SSD hosts VM/LXC virtual disks and fast app runtime data/DBs.
+- **Content kept local**: only latency-sensitive content — VM/LXC disk images and Proxmox snippets. Static content (ISO images, container templates) is offloaded to the Synology; see the full Proxmox storage breakdown in [services/proxmox.md](../services/proxmox.md#storage-configuration-planned).
 
 ### 2. NAS (Synology DS420+)
 - **Capacity**: see [hardware/storage.md](../hardware/storage.md) for volume size and shared folders.
 - **Current Use**: Hosting media files and temporary Home Assistant VM storage.
-- **Future Role**: Pure NAS dedicated to bulk media (movies, TV shows, photos), central backup target, and network storage shares (NFS/SMB).
+- **Future Role**: Pure NAS dedicated to bulk media (movies, TV shows, photos), central backup target, network storage shares (NFS/SMB), and static Proxmox content (ISO images, LXC templates).
 
 ---
 
