@@ -14,11 +14,9 @@ flowchart LR
     end
 
     subgraph Storage - Synology DS420+
-        NAS[Synology DS420+] --> Movies[/volume1/Media/Movies]
-        NAS --> TV[/volume1/Media/TV Shows]
+        NAS[Synology DS420+] --> TV[/volume1/tv]
     end
 
-    Jellyfin -- Mount NFS / SMB --> Movies
     Jellyfin -- Mount NFS / SMB --> TV
 ```
 
@@ -29,4 +27,4 @@ flowchart LR
 - **Host Platform**: Proxmox VE on HP Elite Mini 600 G9.
 - **Deployment Type**: LXC container or lightweight Linux VM (TBD).
 - **Hardware Acceleration**: Host iGPU (Quick Sync Video) passed through for hardware video encoding/decoding — see [hardware/compute.md](../../hardware/compute.md) for the GPU model.
-- **Media Storage**: Remote mounts over SMB or NFS from the Synology DS420+ NAS (`Media/` shared folder).
+- **Media Storage**: Remote mount over SMB or NFS from the Synology DS420+ NAS (`tv` shared folder — the only media share currently available for Jellyfin).

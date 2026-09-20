@@ -38,8 +38,8 @@ flowchart TD
     end
 
     subgraph Synology Storage Shares
-        Synology --> Media[Movies / TV / Media]
-        Synology --> HABackups[HomeAssistantBackups Share]
+        Synology --> Media[tv Share]
+        Synology --> HABackups[homeassistant_backups Share]
     end
 
     Jellyfin -. Mount NFS/SMB .-> Media

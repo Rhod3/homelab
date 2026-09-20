@@ -28,7 +28,7 @@ flowchart LR
 ### 1. Compute Node (HP Elite Mini 600 G9)
 - **Capacity**: see [hardware/compute.md](../hardware/compute.md) for drive models and sizes.
 - **Purpose**: Primary NVMe hosts the Proxmox OS, system logs, and Proxmox snapshots. Secondary SSD hosts VM/LXC virtual disks and fast app runtime data/DBs.
-- **Content kept local**: only latency-sensitive content — VM/LXC disk images and Proxmox snippets. Static content (ISO images, container templates) is offloaded to the Synology; see the full Proxmox storage breakdown in [services/proxmox.md](../services/proxmox.md#storage-configuration-planned).
+- **Content kept local**: only latency-sensitive content — VM/LXC disk images and Proxmox snippets. Static content (ISO images, container templates) is offloaded to the Synology; see the full Proxmox storage breakdown in [services/proxmox.md](../services/proxmox.md#storage-configuration).
 
 ### 2. NAS (Synology DS420+)
 - **Capacity**: see [hardware/storage.md](../hardware/storage.md) for volume size and shared folders.
@@ -44,7 +44,7 @@ To ensure seamless disaster recovery, application-level backups are decoupled fr
 ```mermaid
 flowchart TD
     HA[Home Assistant OS] -->|Built-in Auto Backup| HABackup[HA Backup Package]
-    HABackup -->|Store via SMB/NFS| SynologyShare[Synology 'HomeAssistantBackups' Share]
+    HABackup -->|Store via SMB/NFS| SynologyShare[Synology 'homeassistant_backups' Share]
     SynologyShare -->|Hyper Backup| Dest[Hyper Backup Target]
     Dest --> USB[External USB Drive]
     Dest --> Offsite[Cloud / Remote NAS]
@@ -68,14 +68,14 @@ Until a service has a proven need for something better, every VM/LXC other than 
 ```mermaid
 flowchart TD
     VMs[Proxmox VMs / LXCs<br/>Jellyfin, Docker VM, etc.] -->|Scheduled vzdump| VZDump[vzdump Backup Files]
-    VZDump -->|Store via NFS/SMB| SynologyShare[Synology 'ProxmoxBackups' Share]
+    VZDump -->|Store via NFS/SMB| SynologyShare[Synology 'proxmox_backups' Share]
     SynologyShare -->|Hyper Backup| Dest[Hyper Backup Target]
     Dest --> USB[External USB Drive]
     Dest --> Offsite[Cloud / Remote NAS]
 ```
 
 - **Scope**: whole VM/LXC disk and config snapshot. Crash-consistent, not application-consistent.
-- **Target**: dedicated `ProxmoxBackups` share on the Synology DS420+, separate from `HomeAssistantBackups`.
+- **Target**: dedicated `proxmox_backups` share on the Synology DS420+, separate from `homeassistant_backups`.
 - **Secondary backup**: reuse the existing Hyper Backup path to external/offsite storage rather than introducing a second mechanism.
 
 ### Upgrading to App-Level Backups
