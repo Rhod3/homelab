@@ -37,13 +37,22 @@ flowchart TD
 | LAN | DHCP Server | Enabled |
 | LAN | DHCP Pool | 192.168.0.100 – 192.168.0.249 |
 | LAN | Lease Time | 120 minutes |
-| LAN | Address Reservations | None configured |
+| LAN | Address Reservations | None configured on the router — static assignments below are set device-side instead |
 | Wireless (2.4G/5G) | SSID | `Isengard` |
 | Wireless (2.4G/5G) | Mode | 802.11b/g/n mixed |
 | Wireless (2.4G) | Channel | Auto (currently channel 2) |
 | Guest Network | SSID | `TP-Link_Guest_CD61` |
 | Guest Network | Wireless Radio | Off (not currently in use) |
 | Guest Network | Client Isolation | "Allow Guests to Access Each Other" — Off |
+
+### Static IP Assignments
+
+Devices below `.100` are outside the router's DHCP pool (`192.168.0.100`–`192.168.0.249`) and are configured with a static IP directly on the device rather than via a router-side DHCP reservation.
+
+| Device | IP Address | Configured Via |
+| --- | --- | --- |
+| HP Elite Mini 600 G9 (Proxmox) | 192.168.0.2 | Proxmox host network config (see [hardware/compute.md](compute.md#network-configuration)) |
+| Synology DS420+ | 192.168.0.10 | DSM → Control Panel → Network (see [hardware/storage.md](storage.md#network-configuration)) |
 
 ---
 

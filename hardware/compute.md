@@ -17,6 +17,19 @@ The HP Elite Mini 600 G9 serves as the primary compute node for the homelab, run
 
 ---
 
+## Network Configuration
+
+| Setting | Value |
+| --- | --- |
+| IP Address | 192.168.0.2 (static) |
+| Subnet Mask | 255.255.255.0 |
+| Gateway | 192.168.0.1 |
+| DNS | 192.168.0.1 |
+
+Static IP is outside the router's DHCP pool (192.168.0.100–192.168.0.249) — see [hardware/networking.md](networking.md) for the router's DHCP configuration and the full static assignment list.
+
+---
+
 ## Current Role
 
 - Runs Proxmox VE as the base operating system.

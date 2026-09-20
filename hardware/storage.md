@@ -15,6 +15,19 @@ The Synology DS420+ acts as the central Network Attached Storage (NAS) for the h
 
 ---
 
+## Network Configuration
+
+| Setting | Value |
+| --- | --- |
+| IP Address | 192.168.0.10 (static, set in DSM) |
+| Subnet Mask | 255.255.255.0 |
+| Gateway | 192.168.0.1 |
+| DNS | 192.168.0.1 |
+
+Static IP is configured directly in DSM (Control Panel → Network → Network Interface) rather than via a router DHCP reservation, chosen to be outside the router's DHCP pool (192.168.0.100–192.168.0.249) — see [hardware/networking.md](networking.md) for the router's DHCP configuration.
+
+---
+
 ## Physical Drives
 
 | Model | Capacity | Family | Interface | Speed |
@@ -47,7 +60,7 @@ Access control follows a least-privilege pattern, scoped per share. The mechanis
 
 `ProxmoxBackups/` and `ProxmoxTemplates/` (both **Planned**) are consumed by Proxmox over NFS rather than SMB, so access control is host-based rather than account-based:
 
-- **Export restriction**: Each NFS export should be restricted to the Proxmox host's IP only — no other client should be permitted to mount these shares.
+- **Export restriction**: Each NFS export should be restricted to the Proxmox host's static IP (192.168.0.2 — see [hardware/compute.md](compute.md#network-configuration)) only — no other client should be permitted to mount these shares.
 - **Root squash**: Enable squash mapping so the Proxmox host's root user is mapped to a non-privileged user on the Synology side, rather than granted root-equivalent access to the share.
 - **Scope**: Each share should only expose the content type it's named for (backups vs. ISO/templates) — avoid combining them into a single general-purpose export.
 
