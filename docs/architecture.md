@@ -15,7 +15,7 @@ The setup starts with low-cost components and evolves over time. The primary obj
 | **Compute** | HP Elite Mini 600 G9 | Hypervisor (Proxmox VE) for VMs & LXC containers |
 | **Storage** | Synology DS420+ | Bulk media storage, backups, network storage |
 | **Virtualization** | Proxmox VE | Central virtualization platform on HP Mini |
-| **Networking** | ASUS RT-AC2300 + 8-port Switch | Initially Gigabit, transitioning to managed 2.5/10 GbE |
+| **Networking** | TP-Link Archer C2300-class + 8-port Switch | Initially Gigabit, transitioning to managed 2.5/10 GbE |
 | **Smart Home** | Home Assistant OS | Virtual machine running Home Assistant OS |
 
 ---

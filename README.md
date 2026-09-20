@@ -10,6 +10,7 @@ The goal of this project is to start with a simple, low-cost setup and progressi
 
 - **Overview & Strategy**: [docs/architecture.md](docs/architecture.md)
 - **Storage & Backup Strategy**: [docs/storage-strategy.md](docs/storage-strategy.md)
+- **Network Strategy**: [docs/network-strategy.md](docs/network-strategy.md)
 - **Hardware Overview**:
   - [hardware/compute.md](hardware/compute.md) - HP Elite Mini 600 G9 (Proxmox VE Host)
   - [hardware/storage.md](hardware/storage.md) - Synology DS420+ NAS

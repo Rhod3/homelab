@@ -18,7 +18,7 @@ Add a dedicated UPS unit to protect core infrastructure.
 ### Protected Equipment
 - Synology DS420+ NAS
 - HP Elite Mini 600 G9 Compute Host
-- Network Switch & ASUS Router
+- Network Switch & TP-Link Router
 
 ### Objectives
 1. **Outage Ride-Through**: Maintain operations during brief voltage sags and short outages.

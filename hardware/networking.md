@@ -1,6 +1,6 @@
 # Networking Infrastructure
 
-This document details the current topology and future network design.
+This document details the current topology and future network design. For a broader discussion of alternative segmentation models, gateway options, and rollout sequencing, see [docs/network-strategy.md](../docs/network-strategy.md).
 
 ---
 
@@ -8,17 +8,42 @@ This document details the current topology and future network design.
 
 ```mermaid
 flowchart TD
-    Internet[Internet] --> Router[ASUS RT-AC2300 Router]
+    Internet[Internet] --> Upstream[Upstream ISP Router/ONT<br/>192.168.1.1]
+    Upstream -->|WAN: 192.168.1.22/24| Router[TP-Link Archer C2300<br/>LAN: 192.168.0.1/24]
     Router --> Switch[8-Port Gigabit Switch]
     Switch --> HP[HP Elite Mini 600 G9]
     Switch --> Synology[Synology DS420+]
     Switch --> PC[PC & Client Devices]
     Switch --> Spare[Spare Switch Ports]
+    Router -.Wi-Fi: Isengard.-> WiFiClients[Wireless Clients]
+    Router -.Guest Wi-Fi radio off.-> GuestClients[Guest Clients]
 ```
 
 ### Current Components
-- **Router**: ASUS RT-AC2300
+- **ISP Router**: Model unknown/not tracked. Provided by the ISP solely to hand internet access to the TP-Link router's WAN port (192.168.1.1 side of the double-NAT). Not otherwise managed or configured as part of this homelab.
+- **Router**: TP-Link Archer C2300-class (AC2300 tier)
 - **Switch**: 8-Port Unmanaged Gigabit Ethernet Switch
+
+### Router Configuration (as observed)
+
+| Interface | Setting | Value |
+| --- | --- | --- |
+| WAN | IP Address | 192.168.1.22 |
+| WAN | Subnet Mask | 255.255.255.0 |
+| WAN | Default Gateway | 192.168.1.1 (ISP router — see Current Components above) |
+| WAN | Connection Type | Dynamic IP |
+| LAN | IP Address | 192.168.0.1 |
+| LAN | Subnet Mask | 255.255.255.0 |
+| LAN | DHCP Server | Enabled |
+| LAN | DHCP Pool | 192.168.0.100 – 192.168.0.249 |
+| LAN | Lease Time | 120 minutes |
+| LAN | Address Reservations | None configured |
+| Wireless (2.4G/5G) | SSID | `Isengard` |
+| Wireless (2.4G/5G) | Mode | 802.11b/g/n mixed |
+| Wireless (2.4G) | Channel | Auto (currently channel 2) |
+| Guest Network | SSID | `TP-Link_Guest_CD61` |
+| Guest Network | Wireless Radio | Off (not currently in use) |
+| Guest Network | Client Isolation | "Allow Guests to Access Each Other" — Off |
 
 ---
 

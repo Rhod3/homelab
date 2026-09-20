@@ -11,7 +11,7 @@ Primary components:
 - Storage: Synology DS420+
 - Smart home: Home Assistant OS
 - Media: Jellyfin, planned
-- Networking: ASUS router and Gigabit switch initially, managed VLAN-capable networking later
+- Networking: TP-Link Archer C2300-class router and Gigabit switch initially, managed VLAN-capable networking later
 
 ## Canonical Documentation
 
