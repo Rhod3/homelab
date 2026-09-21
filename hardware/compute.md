@@ -13,7 +13,7 @@ The HP Elite Mini 600 G9 serves as the primary compute node for the homelab, run
 | **RAM** | 32 GB DDR5 |
 | **Storage** | 256 GB NVMe SSD (primary, OS/boot) + 512 GB SSD (secondary, second M.2 port) |
 | **iGPU** | Intel UHD Graphics 770 (Quick Sync Video support) |
-| **Hypervisor** | Proxmox VE |
+| **Hypervisor** | Proxmox VE 9.2 |
 
 ---
 

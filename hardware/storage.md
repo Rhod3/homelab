@@ -86,10 +86,11 @@ Access control follows a least-privilege pattern, scoped per share. The mechanis
 - **Root squash**: Squash mapping is enabled so the Proxmox host's root user is mapped to a non-privileged user on the Synology side, rather than granted root-equivalent access to the share.
 - **Scope**: Each share only exposes the content type it's named for (backups vs. ISO/templates) — not combined into a single general-purpose export.
 
-### `tv` (current state, not access-restricted)
+### `tv` (current state, NFS enabled and host-restricted)
 
-- No dedicated account or host restriction is currently configured — it is an open LAN share for general/family access. This is a deliberate current-state choice, not an oversight.
-- If a service like Jellyfin (planned) later needs its own read access, consider giving it a scoped read-only account rather than relying on open access, at that point.
+- **NFS is enabled** on this share, exported **Read Only** to the **Proxmox host** (`192.168.0.2`) only. It remains accessible over SMB/CIFS for general/family LAN access as before.
+- **Squash: Map all users to admin.** Required because NFS permission checks happen server-side against the caller's real UID — an unprivileged LXC's mapped UID (~100000+, not the container's apparent `root`) doesn't correspond to any NAS user, so requests were rejected outright regardless of the share's permissive (`777`) file modes. Squashing every caller to one known, readable account sidesteps the mismatch. Safe here since the export is read-only.
+- The export authorizes the **Proxmox host's** IP, not the Jellyfin container's (`192.168.0.30`), because the host mounts the share and passes it into the container via a bind mount point — the container cannot mount NFS directly (a Linux kernel restriction, unrelated to this export's config) — see [services/proxmox.md](../services/proxmox.md#service-level-storage-media-app-data) and [services/jellyfin/README.md](../services/jellyfin/README.md) for the full story.
 
 ---
 

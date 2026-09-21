@@ -49,10 +49,18 @@ flowchart TD
 
 Devices below `.100` are outside the router's DHCP pool (`192.168.0.100`–`192.168.0.249`) and are configured with a static IP directly on the device rather than via a router-side DHCP reservation.
 
+Within that `.1`–`.99` static range, a sub-range convention keeps assignments organized ahead of eventual VLAN segmentation:
+
+| Range | Purpose | Maps to (future) |
+| --- | --- | --- |
+| `.2`–`.29` | Core infrastructure (hypervisor, NAS, network gear) | VLAN 10 — Management |
+| `.30`–`.99` | Individual services/apps hosted on Proxmox (LXCs/VMs) | VLAN 20 — Servers |
+
 | Device | IP Address | Configured Via |
 | --- | --- | --- |
 | HP Elite Mini 600 G9 (Proxmox) | 192.168.0.2 | Proxmox host network config (see [hardware/compute.md](compute.md#network-configuration)) |
 | Synology DS420+ | 192.168.0.10 | DSM → Control Panel → Network (see [hardware/storage.md](storage.md#network-configuration)) |
+| Jellyfin LXC (CT 100) | 192.168.0.30 | Proxmox VE Advanced Settings during LXC creation (see [services/jellyfin/README.md](../services/jellyfin/README.md)) |
 
 ---
 

@@ -2,6 +2,8 @@
 
 Proxmox Virtual Environment (VE) serves as the core compute virtualization platform for the homelab, running on the HP Elite Mini 600 G9.
 
+**Current version**: 9.2 — see [hardware/compute.md](../hardware/compute.md) for host specs.
+
 ---
 
 ## Configuration Summary
@@ -17,7 +19,7 @@ Proxmox Virtual Environment (VE) serves as the core compute virtualization platf
 
 - **Home Assistant OS VM**: (Migration target from Synology VMM)
 - **Jellyfin**: Planned LXC container with Intel Quick Sync GPU passthrough.
-- **Docker VM**: Planned general-purpose Linux VM running containerized services.
+- **Future services** (MQTT/Zigbee2MQTT, AdGuard Home, Immich, Paperless-ngx, etc.): each deployed as its own dedicated LXC or VM, sized and provisioned individually rather than consolidated into a shared container host — see [services/README.md](README.md) for current status.
 
 ---
 
@@ -37,6 +39,16 @@ Proxmox storage is split by content type: latency-sensitive content stays local,
 ### Why Disk image / Container stay local
 
 Running live VM/LXC disks over NFS would tie VM I/O performance to the network path (currently Gigabit switch — see [hardware/networking.md](../hardware/networking.md)), well below local SSD throughput, and would turn a network hiccup into a VM stall. This keeps compute and storage responsibilities separate per the repo's guiding principles.
+
+### Service-Level Storage (Media, App Data)
+
+Only Proxmox's own operational data — `vzdump` backups and ISO/template files — is registered as Proxmox-level NFS storage (`nas-backups`, `nas-images` above), as genuine Datacenter → Storage entries.
+
+Data that belongs to an individual service (e.g. Jellyfin's media library, or future services like Immich's photo library or Paperless-ngx's document store) was originally planned to be mounted directly inside that service's own VM/LXC as a guest-level NFS/SMB client, so each service's storage dependency stays self-contained in its own config rather than the host accumulating per-service mount points. That plan still holds for VMs and *privileged* LXCs, but turned out to be a hard dead end for **unprivileged** LXCs — the default and strongly preferred container type for lightweight services (see [services/jellyfin/README.md](jellyfin/README.md)).
+
+**Why**: the Linux kernel's NFS client filesystem doesn't support being mounted from inside an unprivileged user namespace (it lacks the `FS_USERNS_MOUNT` capability that filesystems like `overlay` or `fuse` have). An unprivileged container's "root" only has full capabilities within its own nested namespace, and NFS's mount permission check requires genuine, host-level `CAP_SYS_ADMIN` — something no AppArmor policy or Proxmox `features` flag can grant a truly unprivileged container. This was discovered hands-on while deploying Jellyfin, after extensive troubleshooting ruled out AppArmor, export ACLs, NFS protocol version, and privileged-port settings one by one — see [services/jellyfin/README.md](jellyfin/README.md) for the full trail, and this community write-up for independent confirmation of the same workaround: [Proxmox forum — Mounting NFS share to an unprivileged LXC](https://forum.proxmox.com/threads/tutorial-mounting-nfs-share-to-an-unprivileged-lxc.138506/).
+
+**Revised pattern for unprivileged LXCs**: the Proxmox host mounts the NFS share itself (as real root, so the kernel restriction doesn't apply) into a plain directory under `/mnt/`, and the mount is passed into the container as a bind-style mount point (`pct set <vmid> -mp0 /mnt/<host-path>,mp=<container-path>`). This is *not* a registered Proxmox storage entry — it doesn't appear under Datacenter → Storage, and each service still gets its own dedicated host mount point rather than sharing one — so it's a narrow, kernel-forced exception to the scoping principle above, not an abandonment of it. The trade-off accepted: the host now carries one mount point per NFS-backed unprivileged service, in exchange for keeping those containers unprivileged.
 
 ### Status
 
