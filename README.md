@@ -16,6 +16,7 @@ The goal of this project is to start with a simple, low-cost setup and progressi
   - [hardware/storage.md](hardware/storage.md) - Synology DS420+ NAS
   - [hardware/networking.md](hardware/networking.md) - Network topology & future VLAN layout
   - [hardware/power.md](hardware/power.md) - Power management & UPS plan
+  - [hardware/mini-rack.md](hardware/mini-rack.md) - KWS Rack v2, 3D-printed 10" enclosure (planned)
 - **Services Directory**:
   - [services/README.md](services/README.md) - Service index & status
   - [services/proxmox.md](services/proxmox.md) - Hypervisor configuration

@@ -22,7 +22,7 @@ flowchart TD
 ### Current Components
 - **ISP Router**: Model unknown/not tracked. Provided by the ISP solely to hand internet access to the TP-Link router's WAN port (192.168.1.1 side of the double-NAT). Not otherwise managed or configured as part of this homelab.
 - **Router**: TP-Link Archer C2300-class (AC2300 tier)
-- **Switch**: 8-Port Unmanaged Gigabit Ethernet Switch
+- **Switch**: TP-Link LS1008G — 8-Port 10/100/1000Mbps unmanaged desktop switch (127 × 66.5 × 23 mm, fanless)
 
 ### Router Configuration (as observed)
 
