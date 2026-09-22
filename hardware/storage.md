@@ -24,7 +24,7 @@ The Synology DS420+ acts as the central Network Attached Storage (NAS) for the h
 | Gateway | 192.168.0.1 |
 | DNS | 192.168.0.1 |
 
-Static IP is configured directly in DSM (Control Panel → Network → Network Interface) rather than via a router DHCP reservation, chosen to be outside the router's DHCP pool (192.168.0.100–192.168.0.249) — see [hardware/networking.md](networking.md) for the router's DHCP configuration.
+Static IP is configured directly in DSM (Control Panel → Network → Network Interface) rather than via a router DHCP reservation, chosen to be outside the router's DHCP pool — see [hardware/networking.md](networking.md#router-configuration-as-observed) for the DHCP pool range and router configuration.
 
 ---
 
@@ -62,8 +62,8 @@ Since the volume is confirmed Btrfs, **data checksums are supported** and can be
 
 - `tv/`: Contains streaming media — the only media share, used by the planned Jellyfin deployment (see [services/jellyfin/README.md](../services/jellyfin/README.md)).
 - `homeassistant_backups/`: Dedicated share reserved for automated Home Assistant backups.
-- `proxmox_backups/` (**Created**): NFS target for scheduled `vzdump` backups of all VMs/LXCs except Home Assistant. See [services/proxmox.md](../services/proxmox.md).
-- `proxmox_images/` (**Created**): NFS target for Proxmox ISO images and LXC container templates, offloaded from local compute storage. See [services/proxmox.md](../services/proxmox.md).
+- `proxmox_backups/` (**Created**): NFS target for scheduled `vzdump` backups of all VMs/LXCs except Home Assistant. See [services/proxmox.md](../services/proxmox.md#storage-configuration).
+- `proxmox_images/` (**Created**): NFS target for Proxmox ISO images and LXC container templates, offloaded from local compute storage. See [services/proxmox.md](../services/proxmox.md#storage-configuration).
 
 All four shares use `snake_case` naming — consistent across the board.
 
@@ -76,7 +76,7 @@ Access control follows a least-privilege pattern, scoped per share. The mechanis
 ### SMB/CIFS Shares (user-account based)
 
 - **`homeassistant_backups`**: A dedicated Synology user account named `ha-backup` is configured, restricted exclusively to read/write access on this share. No other share access is granted.
-- This is the template to reuse for any future app-level backup export (e.g. Paperless-ngx, Immich) that needs its own SMB/CIFS credential — see the backup approach table in [docs/storage-strategy.md](../docs/storage-strategy.md).
+- This is the template to reuse for any future app-level backup export (e.g. Paperless-ngx, Immich) that needs its own SMB/CIFS credential — see the backup approach table in [docs/storage-strategy.md](../docs/storage-strategy.md#upgrading-to-app-level-backups).
 
 ### NFS Shares (host-restricted)
 
@@ -90,14 +90,10 @@ Access control follows a least-privilege pattern, scoped per share. The mechanis
 
 - **NFS is enabled** on this share, exported **Read Only** to the **Proxmox host** (`192.168.0.2`) only. It remains accessible over SMB/CIFS for general/family LAN access as before.
 - **Squash: Map all users to admin.** Required because NFS permission checks happen server-side against the caller's real UID — an unprivileged LXC's mapped UID (~100000+, not the container's apparent `root`) doesn't correspond to any NAS user, so requests were rejected outright regardless of the share's permissive (`777`) file modes. Squashing every caller to one known, readable account sidesteps the mismatch. Safe here since the export is read-only.
-- The export authorizes the **Proxmox host's** IP, not the Jellyfin container's (`192.168.0.30`), because the host mounts the share and passes it into the container via a bind mount point — the container cannot mount NFS directly (a Linux kernel restriction, unrelated to this export's config) — see [services/proxmox.md](../services/proxmox.md#service-level-storage-media-app-data) and [services/jellyfin/README.md](../services/jellyfin/README.md) for the full story.
+- The export authorizes the **Proxmox host's** IP, not the Jellyfin container's (`192.168.0.30`), because the host mounts the share and passes it into the container via a bind mount point — the container cannot mount NFS directly (a Linux kernel restriction, unrelated to this export's config) — see [services/proxmox.md](../services/proxmox.md#service-level-storage-media-app-data) and [services/jellyfin/README.md](../services/jellyfin/README.md#deployment-specs) for the full story.
 
 ---
 
 ## Migration Strategy
 
-Currently, the Home Assistant OS VM runs on Synology VMM. 
-
-**Target State**:
-- Migrate the Home Assistant VM off Synology VMM onto Proxmox VE on the HP Elite Mini host.
-- Re-purpose the Synology DS420+ strictly as a high-capacity storage and backup target.
+The Home Assistant OS VM currently runs on Synology VMM and is planned to migrate to Proxmox VE, after which the Synology DS420+ becomes strictly a storage and backup target. See [services/home-assistant/README.md](../services/home-assistant/README.md) for the full migration plan.

@@ -20,6 +20,7 @@ Use these files as the source of truth:
 - `README.md`: main index and high-level design principles
 - `docs/architecture.md`: overall architecture and topology
 - `docs/storage-strategy.md`: storage and backup strategy
+- `docs/network-strategy.md`: network segmentation, gateway/wireless/DNS options, and rollout sequencing
 - `hardware/compute.md`: HP Elite Mini / Proxmox host details
 - `hardware/storage.md`: Synology DS420+ details
 - `hardware/networking.md`: current and future network design

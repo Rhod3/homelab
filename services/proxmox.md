@@ -19,7 +19,7 @@ Proxmox Virtual Environment (VE) serves as the core compute virtualization platf
 
 - **Home Assistant OS VM**: (Migration target from Synology VMM)
 - **Jellyfin**: Planned LXC container with Intel Quick Sync GPU passthrough.
-- **Future services** (MQTT/Zigbee2MQTT, AdGuard Home, Immich, Paperless-ngx, etc.): each deployed as its own dedicated LXC or VM, sized and provisioned individually rather than consolidated into a shared container host — see [services/README.md](README.md) for current status.
+- **Future services** (MQTT/Zigbee2MQTT, AdGuard Home, Immich, Paperless-ngx, etc.): each deployed as its own dedicated LXC or VM, sized and provisioned individually rather than consolidated into a shared container host — see [services/README.md](README.md#service-status-matrix) for current status.
 
 ---
 
@@ -38,7 +38,7 @@ Proxmox storage is split by content type: latency-sensitive content stays local,
 
 ### Why Disk image / Container stay local
 
-Running live VM/LXC disks over NFS would tie VM I/O performance to the network path (currently Gigabit switch — see [hardware/networking.md](../hardware/networking.md)), well below local SSD throughput, and would turn a network hiccup into a VM stall. This keeps compute and storage responsibilities separate per the repo's guiding principles.
+Running live VM/LXC disks over NFS would tie VM I/O performance to the network path (currently Gigabit switch — see [hardware/networking.md](../hardware/networking.md#current-topology)), well below local SSD throughput, and would turn a network hiccup into a VM stall. This keeps compute and storage responsibilities separate per the repo's guiding principles.
 
 ### Service-Level Storage (Media, App Data)
 
@@ -52,7 +52,7 @@ Data that belongs to an individual service (e.g. Jellyfin's media library, or fu
 
 ### Status
 
-- **Synology side**: Done. The `proxmox_backups` and `proxmox_images` shared folders are created with host-restricted NFS permissions — see [hardware/storage.md](../hardware/storage.md).
+- **Synology side**: Done. The `proxmox_backups` and `proxmox_images` shared folders are created with host-restricted NFS permissions — see [hardware/storage.md](../hardware/storage.md#nfs-shares-host-restricted).
 - **Proxmox side**: Done. The `nas-images` and `nas-backups` NFS storage entries are added under Datacenter → Storage, pointed at the shares above.
 - **`vm-disks`**: Done. Created as its own LVM-Thin pool/VG on the secondary 512 GB SSD (467.28 GB), separate from `pve`.
 - **Legacy pool cleanup**: Done. Proxmox's default installer had placed a second thin pool (`pve/data`, ~141 GB) on the *primary* NVMe alongside `local` — this was the installer's default behavior when only one disk is selected at install time, not an intentional storage tier. It was removed and its space reclaimed into `pve/root` (now 226 GB), so `local-lvm` no longer exists and the storage list matches the table above exactly, with no unused legacy pool.

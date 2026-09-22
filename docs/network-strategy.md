@@ -126,7 +126,7 @@ Keep DHCP and DNS on whatever device is playing router (TP-Link, UniFi Gateway, 
 
 ### Proposition B — AdGuard Home (or Pi-hole) as DNS, router keeps DHCP
 
-Deploy AdGuard Home as an LXC/VM on Proxmox (already tracked as "Planned" in [services/README.md](../services/README.md)) for DNS filtering, while DHCP stays on the router/gateway pointing clients at it.
+Deploy AdGuard Home as an LXC/VM on Proxmox (already tracked as "Planned" in [services/README.md](../services/README.md#service-status-matrix)) for DNS filtering, while DHCP stays on the router/gateway pointing clients at it.
 
 - **Pros**: Network-wide ad/tracker blocking without taking DHCP availability risk; matches the already-planned service.
 - **Cons**: Adds a soft dependency — if the AdGuard VM is down, DNS resolution degrades for the network unless a fallback resolver is configured on clients/router.

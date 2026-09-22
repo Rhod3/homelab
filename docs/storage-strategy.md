@@ -89,4 +89,4 @@ flowchart TD
 | **Jellyfin** | No native export; media already lives on the NAS | Periodic copy of the config/DB directory only |
 | **Docker VM, MQTT, AdGuard Home, etc.** | No native export | `vzdump` baseline is sufficient |
 
-This table is not a commitment to build these integrations now. It exists so that when a service moves from "Planned" to "Deployed" in [services/README.md](../services/README.md), its backup method is a deliberate choice rather than an afterthought.
+This table is not a commitment to build these integrations now. It exists so that when a service moves from "Planned" to "Deployed" in [services/README.md](../services/README.md#service-status-matrix), its backup method is a deliberate choice rather than an afterthought.

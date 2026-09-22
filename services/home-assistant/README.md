@@ -38,7 +38,7 @@ flowchart LR
 ## Migration Plan (Synology VMM → Proxmox VE)
 
 1. **Full Backup**: Generate a complete system backup within Home Assistant.
-2. **Download Backup**: Verify the `.tar` backup file is saved to the Synology backup share (see [hardware/storage.md](../../hardware/storage.md)).
+2. **Download Backup**: Verify the `.tar` backup file is saved to the Synology backup share (see [hardware/storage.md](../../hardware/storage.md#primary-shared-folders)).
 3. **Provision VM on Proxmox**: Create a UEFI-enabled VM on Proxmox VE using the official Home Assistant OS qcow2/KVM image.
 4. **Restore Backup**: Access the fresh Home Assistant onboarding screen and restore from the full backup.
 5. **USB Passthrough**: Reconnect and pass through any USB Zigbee/Z-Wave adapters to the new Proxmox VM.
@@ -47,5 +47,5 @@ flowchart LR
 
 ## Backup Configuration
 
-- **Target & Access**: see [hardware/storage.md](../../hardware/storage.md) for the shared folder and service account.
+- **Target & Access**: see [hardware/storage.md](../../hardware/storage.md#smbcifs-shares-user-account-based) for the shared folder and service account.
 - **Schedule**: Automatic scheduled full backups.
