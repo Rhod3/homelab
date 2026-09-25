@@ -11,9 +11,7 @@ This directory tracks all deployed and planned services within the homelab envir
 | **Proxmox VE** | HP Elite Mini 600 G9 | Deployed | [services/proxmox.md](proxmox.md) |
 | **Home Assistant OS** | Synology VMM → Proxmox VE | Active (Migration Planned) | [services/home-assistant/README.md](home-assistant/README.md) |
 | **Jellyfin** | Proxmox VE (LXC, CT 100) | Deployed | [services/jellyfin/README.md](jellyfin/README.md) |
-| **Docker Engine** | Proxmox VE | Planned | TBD |
-| **MQTT / Zigbee2MQTT** | Proxmox VE | Planned | TBD |
-| **AdGuard Home / Pi-hole** | Proxmox VE | Planned | TBD |
+| **AdGuard Home** | Proxmox VE | Planned | [services/adguard-home/README.md](adguard-home/README.md) |
 | **Immich** | Proxmox VE | Planned | TBD |
 | **Paperless-ngx** | Proxmox VE | Planned | TBD |
 

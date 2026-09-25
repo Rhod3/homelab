@@ -22,3 +22,4 @@ The goal of this project is to start with a simple, low-cost setup and progressi
   - [services/proxmox.md](services/proxmox.md) - Hypervisor configuration
   - [services/home-assistant/README.md](services/home-assistant/README.md) - Home Assistant OS setup & migration
   - [services/jellyfin/README.md](services/jellyfin/README.md) - Jellyfin media server & HW transcoding
+  - [services/adguard-home/README.md](services/adguard-home/README.md) - AdGuard Home local DNS (planned)
