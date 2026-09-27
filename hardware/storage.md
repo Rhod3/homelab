@@ -67,6 +67,8 @@ Since the volume is confirmed Btrfs, **data checksums are supported** and can be
 
 All four shares use `snake_case` naming — consistent across the board.
 
+> **Planned change (arr stack)**: the `tv` share will be reorganized into `torrents/{movies,shows}` + `media/{movies,shows}` (existing `movies/` and `shows/` move under `media/`), gain a **read/write** NFS rule for the arr Docker VM (`192.168.0.31`, squash: No mapping), and a dedicated `arr` DSM user with read/write on `tv` only. The Proxmox host's read-only rule for Jellyfin stays unchanged. See [services/arr-stack/README.md](../services/arr-stack/README.md#storage-plan). Nothing has been changed on the Synology yet.
+
 ---
 
 ## Access Control & Security

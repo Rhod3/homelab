@@ -33,7 +33,7 @@ flowchart TD
     subgraph Proxmox Compute Cluster / Host
         HP --> HA[Home Assistant OS VM]
         HP --> Jellyfin[Jellyfin LXC/VM]
-        HP --> Docker[Docker VM]
+        HP --> Docker[Arr Stack Docker VM]
         HP --> Other[Other VMs / LXCs]
     end
 
@@ -43,6 +43,7 @@ flowchart TD
     end
 
     Jellyfin -. Mount NFS/SMB .-> Media
+    Docker -. NFS read/write .-> Media
     HA -. Auto Backup .-> HABackups
 ```
 

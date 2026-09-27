@@ -87,6 +87,7 @@ flowchart TD
 | **Paperless-ngx** | `document_exporter` / `document_importer` (full portable export) | App-level export, same pattern as Home Assistant |
 | **Immich** | `pg_dump` / `pg_dumpall` for metadata only | DB dump plus filesystem sync of the library folder |
 | **Jellyfin** | No native export; media already lives on the NAS | Periodic copy of the config/DB directory only |
+| **Arr Stack** (Radarr, Sonarr, Prowlarr, …) | Built-in scheduled backup per app (portable `.zip` of config + DB) | `vzdump` of the Docker VM plus each app's built-in backup — see [services/arr-stack/README.md](../services/arr-stack/README.md#backup-requirements) |
 | **Docker VM, MQTT, AdGuard Home, etc.** | No native export | `vzdump` baseline is sufficient |
 
 This table is not a commitment to build these integrations now. It exists so that when a service moves from "Planned" to "Deployed" in [services/README.md](../services/README.md#service-status-matrix), its backup method is a deliberate choice rather than an afterthought.

@@ -86,4 +86,5 @@ Hit during initial verification, before the **Throttle Transcodes** / **Delete s
 ## Future Work
 
 - **App-level config backup**: covered by deployment step 9 — evaluate whether Jellyfin's config/DB directory warrants a dedicated periodic copy alongside the `vzdump` baseline, per [docs/storage-strategy.md](../../docs/storage-strategy.md#upgrading-to-app-level-backups).
+- **Library path changes for the arr stack** (planned): the arr stack will move `movies/` and `shows/` under `media/` in the `tv` share. CT 100's `mp0` mount is unchanged, but the two libraries get re-created at `/mnt/tv/media/movies` and `/mnt/tv/media/shows` (watched status may reset) — see [services/arr-stack/README.md](../arr-stack/README.md#impact-on-jellyfin-ct-100).
 - **Full hardware decode+tonemap pipeline**: confirm (via a fresh transcode log) that hardware decoding and tone-mapping are actually engaging for HDR/HEVC sources now that the relevant checkboxes are enabled, not just the encode step.

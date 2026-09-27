@@ -1,0 +1,170 @@
+# Arr stack — runs on the Arr Docker VM (192.168.0.31).
+# Plan, rationale and deployment steps: services/arr-stack/README.md
+#
+# All site-specific values (UID/GID, time zone, image tags, VPN provider) come
+# from .env — copy .env.example to .env on the VM and fill it in. `${VAR:?}`
+# makes `docker compose` refuse to start if a required value is missing.
+
+name: arr-stack
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+# Merged into each service's own `environment:` map below. YAML merge is
+# shallow, so a service must merge this explicitly rather than inherit it —
+# otherwise defining its own `environment:` would silently drop these.
+x-env: &env
+  PUID: ${PUID:?}
+  PGID: ${PGID:?}
+  UMASK: "002"
+  TZ: ${TZ:?}
+
+x-common: &common
+  restart: unless-stopped
+  logging: *logging
+
+services:
+  ###############################################
+  # PROWLARR - Indexer manager
+  ###############################################
+  prowlarr:
+    <<: *common
+    container_name: prowlarr
+    image: ghcr.io/hotio/prowlarr:${PROWLARR_TAG:?}
+    environment:
+      <<: *env
+    ports:
+      - 9696:9696
+    volumes:
+      - ${APPDATA:?}/prowlarr:/config
+
+  ###############################################
+  # RADARR - Movies
+  ###############################################
+  radarr:
+    <<: *common
+    container_name: radarr
+    image: ghcr.io/hotio/radarr:${RADARR_TAG:?}
+    environment:
+      <<: *env
+    ports:
+      - 7878:7878
+    volumes:
+      - ${APPDATA:?}/radarr:/config
+      - ${DATA:?}:/data
+
+  ###############################################
+  # SONARR - TV shows
+  ###############################################
+  sonarr:
+    <<: *common
+    container_name: sonarr
+    image: ghcr.io/hotio/sonarr:${SONARR_TAG:?}
+    environment:
+      <<: *env
+    ports:
+      - 8989:8989
+    volumes:
+      - ${APPDATA:?}/sonarr:/config
+      - ${DATA:?}:/data
+
+  ###############################################
+  # QBITTORRENT - Downloader, all traffic via WireGuard
+  ###############################################
+  # WireGuard config goes in ${APPDATA}/qbittorrent/wireguard/wg0.conf (secret,
+  # never in this repo). hotio's firewall blocks all non-tunnel traffic except
+  # the Web UI from VPN_LAN_NETWORK, which acts as the kill switch.
+  qbittorrent:
+    <<: *common
+    container_name: qbittorrent
+    image: ghcr.io/hotio/qbittorrent:${QBITTORRENT_TAG:?}
+    # Other containers reach the Web UI at http://qbittorrent.internal:8080
+    hostname: qbittorrent.internal
+    cap_add:
+      - NET_ADMIN
+    environment:
+      <<: *env
+      WEBUI_PORTS: 8080/tcp
+      LIBTORRENT: v1
+      VPN_ENABLED: "true"
+      VPN_CONF: wg0
+      VPN_PROVIDER: ${VPN_PROVIDER:?}
+      VPN_LAN_NETWORK: ${LAN_SUBNET:?}
+      VPN_LAN_LEAK_ENABLED: "false"
+      VPN_AUTO_PORT_FORWARD: ${VPN_AUTO_PORT_FORWARD:?}
+      VPN_HEALTHCHECK_ENABLED: "false"
+      PRIVOXY_ENABLED: "false"
+      UNBOUND_ENABLED: "false"
+    ports:
+      - 8080:8080
+    volumes:
+      - ${APPDATA:?}/qbittorrent:/config
+      - ${DATA:?}:/data
+
+  ###############################################
+  # BAZARR - Subtitles
+  ###############################################
+  bazarr:
+    <<: *common
+    container_name: bazarr
+    image: ghcr.io/hotio/bazarr:${BAZARR_TAG:?}
+    environment:
+      <<: *env
+    ports:
+      - 6767:6767
+    volumes:
+      - ${APPDATA:?}/bazarr:/config
+      - ${DATA:?}/media:/data/media
+
+  ###############################################
+  # SEERR - Requests (successor of Jellyseerr/Overseerr)
+  ###############################################
+  # Always runs as UID 1000 and ignores PUID/PGID: ${APPDATA}/seerr must be
+  # owned by 1000. Needs no access to /data.
+  seerr:
+    <<: *common
+    container_name: seerr
+    image: ghcr.io/seerr-team/seerr:${SEERR_TAG:?}
+    init: true
+    environment:
+      TZ: ${TZ:?}
+      LOG_LEVEL: info
+    ports:
+      - 5055:5055
+    volumes:
+      - ${APPDATA:?}/seerr:/app/config
+
+  ###############################################
+  # FLARESOLVERR - Cloudflare challenge solver for Prowlarr
+  ###############################################
+  # Only reachable on the Docker network (http://flaresolverr:8191), no port
+  # published to the LAN.
+  flaresolverr:
+    <<: *common
+    container_name: flaresolverr
+    image: ghcr.io/flaresolverr/flaresolverr:${FLARESOLVERR_TAG:?}
+    environment:
+      TZ: ${TZ:?}
+      LOG_LEVEL: info
+
+  ###############################################
+  # RECYCLARR - TRaSH Guides profile sync
+  ###############################################
+  # Config: ${APPDATA}/recyclarr/recyclarr.yml, API keys in secrets.yml next to
+  # it (not in this repo). Runs its sync on an internal daily schedule.
+  recyclarr:
+    <<: *common
+    container_name: recyclarr
+    image: ghcr.io/recyclarr/recyclarr:${RECYCLARR_TAG:?}
+    user: ${PUID:?}:${PGID:?}
+    environment:
+      TZ: ${TZ:?}
+    volumes:
+      - ${APPDATA:?}/recyclarr:/config
+
+networks:
+  default:
+    name: arr_network
