@@ -40,8 +40,7 @@ When suggesting or implementing changes:
 4. Keep compute and storage responsibilities separate.
 5. Use the Synology mainly for storage, media, and backups.
 6. Use Proxmox as the central virtualization layer.
-7. Introduce VLANs only when the network is ready for the added complexity.
-8. Favor migration-friendly designs.
+7. Favor migration-friendly designs.
 
 ## Interaction Style
 
@@ -49,6 +48,7 @@ When suggesting or implementing changes:
 - For every non-trivial request (choosing a service, a storage layout, a network change, a migration approach, etc.), present multiple viable options rather than a single recommendation.
 - For each option, list its advantages and disadvantages so the user can make an informed decision.
 - It's fine to state a preferred option, but the reasoning and trade-offs must be explicit rather than assumed.
+- Never run `git commit` or `git push`, and don't offer to. Leave changes in the working tree and summarize what changed; the user reviews and commits everything themselves.
 
 ## Documentation Standards
 
