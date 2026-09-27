@@ -62,7 +62,7 @@ Since the volume is confirmed Btrfs, **data checksums are supported** and can be
 
 - `tv/`: Contains streaming media — the only media share, used by the planned Jellyfin deployment (see [services/jellyfin/README.md](../services/jellyfin/README.md)).
 - `homeassistant_backups/`: Dedicated share reserved for automated Home Assistant backups.
-- `proxmox_backups/` (**Created**): NFS target for scheduled `vzdump` backups of all VMs/LXCs except Home Assistant. See [services/proxmox.md](../services/proxmox.md#storage-configuration).
+- `proxmox_backups/` (**Created**, in use): NFS target for scheduled `vzdump` backups of all VMs/LXCs except Home Assistant. See [services/proxmox.md](../services/proxmox.md#backup-jobs). Current footprint: CT 100 at ~1.8 GB per archive, up to 16 archives under the current retention (~29 GB worst case). Root squash on this export is why Proxmox needs `tmpdir: /var/tmp` to back up unprivileged LXCs.
 - `proxmox_images/` (**Created**): NFS target for Proxmox ISO images and LXC container templates, offloaded from local compute storage. See [services/proxmox.md](../services/proxmox.md#storage-configuration).
 
 All four shares use `snake_case` naming — consistent across the board.

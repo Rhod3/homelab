@@ -2,7 +2,7 @@
 
 Jellyfin is the self-hosted media system for streaming movies and TV shows. It was the first new service deployed: unlike DNS/DHCP-style services, Jellyfin has no dependency in the network's critical path, so a misconfiguration or outage only affects media streaming.
 
-**Status**: Deployed and verified. CT 100 is running with static IP, GPU passthrough, and the `tv` share mounted at `/mnt/tv`; streaming and hardware transcoding via Quick Sync are confirmed working end-to-end — see [Deployment Steps](#deployment-steps). Note: the NFS mount approach differs from the original plan — see [Media Storage](#deployment-specs) below. Remaining: app-level config backup (step 8, tracked as future work).
+**Status**: Deployed and verified. CT 100 is running with static IP, GPU passthrough, and the `tv` share mounted at `/mnt/tv`; streaming and hardware transcoding via Quick Sync are confirmed working end-to-end — see [Deployment Steps](#deployment-steps). Note: the NFS mount approach differs from the original plan — see [Media Storage](#deployment-specs) below. Backups: scheduled `vzdump` job in place and verified (step 9); restore tested successfully (step 10). An app-level config backup remains optional future work.
 
 ---
 
@@ -36,7 +36,7 @@ The host mounts `tv` over NFS itself, then passes it into the Jellyfin LXC as a 
 - **Media Storage**: NFS share (`tv` on the Synology DS420+) mounted by the **Proxmox host**, then passed into the container as a bind-style mount point (`mp0`, host `/mnt/pve-nfs-tv` → container `/mnt/tv`) — not mounted by the container itself. This differs from the originally planned guest-level NFS mount: hands-on troubleshooting found that genuinely unprivileged LXCs cannot mount NFS directly, due to a Linux kernel restriction (the NFS filesystem type isn't mountable from inside an unprivileged user namespace), not a config or permissions gap. See [services/proxmox.md](../proxmox.md#service-level-storage-media-app-data) for the full explanation and the revised pattern this establishes for future NFS-backed unprivileged LXCs. Exported read-only — sufficient because Jellyfin's metadata/cache live in its own internal data directory, not in the media folder.
 - **Network**: Static IP `192.168.0.30`, set during Advanced install — see [hardware/networking.md](../../hardware/networking.md#static-ip-assignments) for the static-IP range convention (`.30`–`.99` reserved for services, ahead of the planned VLAN 20 "Servers" segment).
 - **Network Port**: `8096/tcp` (HTTP web UI/streaming, Jellyfin default). No inbound port forwarding planned — LAN access only.
-- **Backup Approach**: No native export; media already lives on the NAS. Config/DB directory backed up via periodic copy, per [docs/storage-strategy.md](../../docs/storage-strategy.md#upgrading-to-app-level-backups). Until that's set up, the container is covered by the baseline `vzdump` schedule targeting the Synology `proxmox_backups` share (see [services/proxmox.md](../proxmox.md#storage-configuration)).
+- **Backup Approach**: Scheduled `vzdump` of CT 100 in `stop` mode to the `nas-backups` storage (Synology `proxmox_backups` share). It captures the OS, the app, `/etc/jellyfin` and `/var/lib/jellyfin` (DB, metadata, plugins) together; the `mp0` media bind mount is excluded automatically, since media already lives on the NAS. `stop` mode was chosen over `snapshot` so the SQLite DB is consistent, at the cost of ~30 s downtime per run. Job settings, retention, and the `tmpdir` fix required for unprivileged LXCs on root-squashed NFS are documented in [services/proxmox.md](../proxmox.md#backup-jobs). An app-level config copy on top of this is optional — see [Future Work](#future-work).
 - **Dependencies**: Synology DS420+ reachable over NFS (`tv` share); Proxmox host network path (no VLAN dependency at this stage).
 - **Container ID**: 100 (Proxmox VE).
 
@@ -52,7 +52,8 @@ The host mounts `tv` over NFS itself, then passes it into the Jellyfin LXC as a 
 6. ✅ Pass the host mount into CT 100 as a bind-style mount point: `pct set 100 -mp0 /mnt/pve-nfs-tv,mp=/mnt/tv`, then `pct reboot 100`. Confirmed readable from inside the container at `/mnt/tv`.
 7. ✅ Verified streaming works end-to-end, including hardware transcoding via Quick Sync — confirmed via the Jellyfin transcode log showing `-codec:v:0 h264_qsv` with the VA-API/QSV device (`iHD` driver) initialized against `/dev/dri/renderD128`.
 8. ✅ Tuned transcoding settings and resolved a transcode-cache disk-space issue found during verification — see [Transcoding Configuration](#transcoding-configuration) below for the full settings and root cause.
-9. Revisit as a separate follow-up: app-level config backup (the NFS export host-restriction to `192.168.0.2` is already in place as part of step 4).
+9. ✅ Created a `vzdump` backup job for CT 100 (Datacenter → Backup, `stop` mode, ZSTD, `nas-backups`). The first run failed with `Permission denied` on the `.tmp` staging folder (root squash + unprivileged UID mapping); fixed by setting `tmpdir: /var/tmp` in `/etc/vzdump.conf` — see [services/proxmox.md](../proxmox.md#node-wide-setting-tmpdir-vartmp). Second run succeeded on 2026-09-27: 1.81 GB archive, 30 s downtime.
+10. ✅ Tested a restore on 2026-09-27: restored the archive as CT 900 with `net0` removed (the copy keeps CT 100's static IP and MAC), confirmed Jellyfin started with `jellyfin.db` and library data intact, then destroyed CT 900. See [services/proxmox.md](../proxmox.md#verification) for the reusable procedure.
 
 ---
 
@@ -85,6 +86,6 @@ Hit during initial verification, before the **Throttle Transcodes** / **Delete s
 
 ## Future Work
 
-- **App-level config backup**: covered by deployment step 9 — evaluate whether Jellyfin's config/DB directory warrants a dedicated periodic copy alongside the `vzdump` baseline, per [docs/storage-strategy.md](../../docs/storage-strategy.md#upgrading-to-app-level-backups).
+- **App-level config backup** (optional): the `vzdump` job (step 9) already covers the config/DB, but only as a Proxmox-format whole-container archive. Consider adding a portable copy if Jellyfin might later move off LXC (e.g. to Docker). Options: Jellyfin's built-in backup (**Dashboard → Backups**, believed to be available from 10.11 — check CT 100's version first), or a host-side script that stops the service and tars `/etc/jellyfin` + `/var/lib/jellyfin` via `pct exec`. See [docs/storage-strategy.md](../../docs/storage-strategy.md#upgrading-to-app-level-backups).
 - **Library path changes for the arr stack** (planned): the arr stack will move `movies/` and `shows/` under `media/` in the `tv` share. CT 100's `mp0` mount is unchanged, but the two libraries get re-created at `/mnt/tv/media/movies` and `/mnt/tv/media/shows` (watched status may reset) — see [services/arr-stack/README.md](../arr-stack/README.md#impact-on-jellyfin-ct-100).
 - **Full hardware decode+tonemap pipeline**: confirm (via a fresh transcode log) that hardware decoding and tone-mapping are actually engaging for HDR/HEVC sources now that the relevant checkboxes are enabled, not just the encode step.

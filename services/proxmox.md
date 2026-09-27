@@ -18,7 +18,7 @@ Proxmox Virtual Environment (VE) serves as the core compute virtualization platf
 ## Hosted Workloads
 
 - **Home Assistant OS VM**: (Migration target from Synology VMM)
-- **Jellyfin**: Planned LXC container with Intel Quick Sync GPU passthrough.
+- **Jellyfin**: Deployed as unprivileged LXC (CT 100) with Intel Quick Sync GPU passthrough — see [services/jellyfin/README.md](jellyfin/README.md).
 - **Future services** (MQTT/Zigbee2MQTT, AdGuard Home, Immich, Paperless-ngx, etc.): each deployed as its own dedicated LXC or VM, sized and provisioned individually rather than consolidated into a shared container host — see [services/README.md](README.md#service-status-matrix) for current status.
 - **Arr Stack Docker VM** (planned, `192.168.0.31`): the one deliberate exception to the rule above — a single Debian VM running Docker Compose for Prowlarr, Radarr, Sonarr, qBittorrent, and related apps. Justified because the stack is one logical service: the apps must share a single filesystem for hardlinks, are wired together by API keys, and are deployed and updated together. A VM rather than LXC(s) because the apps need **read/write** NFS access, which unprivileged LXCs can't mount (see below) and which the host-bind-mount workaround complicates with UID shifting. This is not a general-purpose Docker host; other services still get their own LXC/VM. See [services/arr-stack/README.md](arr-stack/README.md).
 
@@ -33,7 +33,7 @@ Proxmox storage is split by content type: latency-sensitive content stays local,
 | `local` | Directory | Primary 256 GB NVMe (226 GB `pve/root` LV) | Snippets | Proxmox OS (implicit), cloud-init/hook snippets |
 | `vm-disks` | LVM-Thin | Secondary 512 GB SSD | Disk image, Container | VM and LXC virtual disks — kept local for I/O performance |
 | `nas-images` | NFS | Synology `proxmox_images` share | ISO image, Container template | Installer ISOs and LXC templates — static, infrequently read, no benefit from local NVMe |
-| `nas-backups` | NFS | Synology `proxmox_backups` share | VZDump backup file | Scheduled `vzdump` backups for all VMs/LXCs except Home Assistant |
+| `nas-backups` | NFS | Synology `proxmox_backups` share | VZDump backup file | Scheduled `vzdump` backups for all VMs/LXCs except Home Assistant — see [Backup Jobs](#backup-jobs) |
 
 **Not a Proxmox storage entry**: Home Assistant's own backup engine writes directly to the Synology `homeassistant_backups` share (SMB/NFS) from within the HA VM — it does not go through Proxmox's storage layer. See [services/home-assistant/README.md](home-assistant/README.md).
 
@@ -57,3 +57,52 @@ Data that belongs to an individual service (e.g. Jellyfin's media library, or fu
 - **Proxmox side**: Done. The `nas-images` and `nas-backups` NFS storage entries are added under Datacenter → Storage, pointed at the shares above.
 - **`vm-disks`**: Done. Created as its own LVM-Thin pool/VG on the secondary 512 GB SSD (467.28 GB), separate from `pve`.
 - **Legacy pool cleanup**: Done. Proxmox's default installer had placed a second thin pool (`pve/data`, ~141 GB) on the *primary* NVMe alongside `local` — this was the installer's default behavior when only one disk is selected at install time, not an intentional storage tier. It was removed and its space reclaimed into `pve/root` (now 226 GB), so `local-lvm` no longer exists and the storage list matches the table above exactly, with no unused legacy pool.
+
+---
+
+## Backup Jobs
+
+Scheduled `vzdump` jobs, configured under **Datacenter → Backup** and written to the `nas-backups` storage above. This is the baseline described in [docs/storage-strategy.md](../docs/storage-strategy.md#baseline-proxmox-vzdump).
+
+| Setting | Value | Notes |
+| --- | --- | --- |
+| Node | `pve` | |
+| Guests | CT 100 (Jellyfin) | Home Assistant is deliberately excluded — it uses its own app-level backups |
+| Storage | `nas-backups` | |
+| Mode | `stop` | Clean shutdown before the archive is taken, so Jellyfin's SQLite DB is consistent rather than crash-consistent. Costs ~30 s of downtime per run |
+| Compression | ZSTD | |
+| Notes template | `{{guestname}}` | Labels each archive with the guest name in the Backups view |
+| Retention | `keep-daily=7, keep-weekly=4, keep-monthly=3, keep-yearly=2` | Set node-wide in `/etc/vzdump.conf` (`prune-backups`), not on the job or the storage. At most 16 archives per guest |
+| Notifications | Notification system → `mail-to-root` | Mail goes to the email address set on `root@pam` |
+| Schedule | Daily at `05:00` | Chosen as a time when nobody is streaming, since `stop` mode briefly takes Jellyfin offline |
+
+### How retention works
+
+Retention (`prune-backups`) is applied **per guest, per storage**, right after each backup of that guest finishes. Each `keep-*` rule keeps the newest backup in each of the last N periods (days, ISO weeks, months, years) that actually contain a backup, so missed nights don't use up slots. Rules are applied from shortest to longest period, and each one only considers backups older than those already kept. Anything no rule keeps is deleted.
+
+- **Precedence**: a retention set on the job wins over one set in `/etc/vzdump.conf`, which in turn wins over the storage's own **Backup Retention** setting. If nothing is set anywhere, the default is `keep-all`.
+- **Current choice — node-wide**: retention lives in `/etc/vzdump.conf` on `pve`, next to the `tmpdir` setting below. It therefore applies to every backup this node writes, to any storage, unless a job sets its own. Trade-off: it isn't visible in the storage's or the job's Retention tab (the storage tab can show different values that are silently overridden), and it would have to be repeated on any future second node. Check it with `grep prune /etc/vzdump.conf`.
+- **Manual backups count**: a manual `vzdump` run on the same day as the scheduled job gets pruned by `keep-daily`, because only the newest backup of each day is kept. Mark pre-upgrade backups **Protected** (Backups view → Edit) to exempt them.
+- **Preview before changing values**: `pvesm prune-backups nas-backups --vmid <id> --dry-run` lists each archive as `keep` or `remove` without deleting anything.
+
+### Node-wide setting: `tmpdir: /var/tmp`
+
+Set in `/etc/vzdump.conf` on `pve`. It is required for backing up **unprivileged LXCs** to `nas-backups`.
+
+- **Why**: without it, `vzdump` stages temporary files in a `.tmp` folder next to the archive, on the NFS share. The share has root squash enabled (see [hardware/storage.md](../hardware/storage.md#nfs-shares-host-restricted)), so the NAS records that folder as owned by the squashed user rather than root. `tar` for an unprivileged container runs as the container's mapped root (UID 100000), which the NAS doesn't recognize, so the first CT 100 backup failed with `tar: …/vzdump-lxc-100-….tmp: Cannot open: Permission denied`. Pointing `tmpdir` at local disk fixes this without weakening root squash, which was the other option considered and rejected.
+- **Impact in `stop`/`snapshot` mode**: negligible. The staging area only holds the container's config files (`pct.conf`, `pct.fw`, a few KB), and the archive itself still goes straight to `nas-backups`.
+- **Risk — suspend mode**: in `suspend` mode, `vzdump` `rsync`s the **entire container filesystem** into `tmpdir`. That would land on `pve/root`, the filesystem Proxmox itself runs on, and a large container could fill it. `vzdump` falls back to suspend automatically when `snapshot` mode is requested on storage that can't take snapshots. Watch for `trying 'suspend' mode instead` in backup logs. `vm-disks` is LVM-thin and supports snapshots, so current jobs are not affected.
+- **Why `/var/tmp` and not `/tmp`**: `/var/tmp` is on disk and Debian doesn't clear it at boot. `/tmp` may be RAM-backed on newer Debian-based Proxmox releases.
+
+### Verification
+
+- **First successful run**: 2026-09-27. CT 100: 3.3 GiB read, 1.81 GB archive, guest back online after 30 s. The log confirmed `mp0` (`/mnt/tv`) was excluded as a bind mount, so media is never copied into backups.
+- **Test restore**: passed on 2026-09-27. The 2026-09-27 archive was restored as CT 900 on `vm-disks`, and Jellyfin started with its data intact: `jellyfin.db` was present with an empty `-wal` file, confirming `stop` mode captured a fully written DB. Procedure, reusable for any LXC:
+  ```bash
+  pct restore 900 /mnt/pve/nas-backups/dump/<archive>.tar.zst --storage vm-disks
+  pct set 900 --delete net0     # the copy keeps the original's static IP and MAC, so it must not join the network
+  pct start 900
+  pct exec 900 -- systemctl status <service>
+  pct stop 900 && pct destroy 900   # destroy refuses a running container
+  ```
+  Expected noise: with no network, apps log connection errors, e.g. Jellyfin's plugin repository check throws an `HttpClient` stack trace. This is harmless.

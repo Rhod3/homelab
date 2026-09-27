@@ -77,6 +77,7 @@ flowchart TD
 - **Scope**: whole VM/LXC disk and config snapshot. Crash-consistent, not application-consistent.
 - **Target**: dedicated `proxmox_backups` share on the Synology DS420+, separate from `homeassistant_backups`.
 - **Secondary backup**: reuse the existing Hyper Backup path to external/offsite storage rather than introducing a second mechanism.
+- **Status**: Active for Jellyfin (CT 100) since 2026-09-27, in `stop` mode. Job settings, retention, and the `tmpdir` fix needed for unprivileged LXCs on root-squashed NFS are in [services/proxmox.md](../services/proxmox.md#backup-jobs). Hyper Backup of `proxmox_backups` is not yet documented as configured. Until it is, backups and media share the same NAS, so a Synology failure would lose both.
 
 ### Upgrading to App-Level Backups
 
@@ -91,3 +92,13 @@ flowchart TD
 | **Docker VM, MQTT, AdGuard Home, etc.** | No native export | `vzdump` baseline is sufficient |
 
 This table is not a commitment to build these integrations now. It exists so that when a service moves from "Planned" to "Deployed" in [services/README.md](../services/README.md#service-status-matrix), its backup method is a deliberate choice rather than an afterthought.
+
+### Future Option: Proxmox Backup Server (speculative)
+
+Not planned yet. It's recorded here as the natural next step if the `vzdump` baseline stops scaling. Every `vzdump` run is a full copy, so NAS space and backup time grow with each new guest (AdGuard Home, the arr-stack VM, and so on). This matters given the DS420+ capacity warning in [hardware/storage.md](../hardware/storage.md).
+
+| | Proxmox Backup Server (PBS) |
+| --- | --- |
+| **Advantages** | Incremental, deduplicated backups, so nightly runs are small and fast. Built-in verification jobs, optional client-side encryption, and single-file restore from the Proxmox UI. Talks to Proxmox over its own protocol, so there are no NFS root-squash / unprivileged-UID issues. |
+| **Disadvantages** | One more service to run and back up. It should live *outside* the host it protects: a PBS guest on the same Proxmox host protects against mistakes but not against losing the host, while the DS420+ (VMM) has modest CPU and RAM for it. Adds complexity that isn't justified at one or two guests. |
+| **Revisit when** | Several guests are deployed and full `vzdump` archives start to strain NAS capacity or the backup window. |
