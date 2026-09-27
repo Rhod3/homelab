@@ -2,7 +2,7 @@
 
 The arr stack automates finding, downloading, renaming, and filing movies and TV shows into the media library that Jellyfin already serves. It is treated as **one logical service** made of tightly coupled apps: they share a single filesystem (required for hardlinks), talk to each other over API keys, and are deployed and updated together.
 
-**Status**: Planned. Not yet deployed. All design decisions are made (see [Decision Log](#decision-log)); the only open item is the choice of VPN provider.
+**Status**: Planned. Not yet deployed. All design decisions are made, including the VPN provider (Proton VPN) — see [Decision Log](#decision-log).
 
 **Reference setup**: [automation-avenue/arr-new](https://github.com/automation-avenue/arr-new) — a single `docker-compose.yml` following the [TRaSH Guides](https://trash-guides.info/File-and-Folder-Structure/How-to-set-up/Docker/) folder layout. Used as a starting point, not copied as-is; see [Deviations from the Reference Setup](#deviations-from-the-reference-setup).
 
@@ -176,7 +176,19 @@ qBittorrent uses hotio's built-in WireGuard support rather than a separate VPN c
 - `VPN_LAN_NETWORK=192.168.0.0/24` allows LAN devices to reach the Web UI despite the firewall.
 - `hostname: qbittorrent.internal` is hotio's documented way for other containers on the same Docker network to reach the Web UI. Radarr/Sonarr/Prowlarr use `qbittorrent.internal` as the download client host.
 - The WireGuard config (`wg0.conf`, containing the VPN private key) goes in `/docker/appdata/qbittorrent/wireguard/wg0.conf` on the VM. **It is a secret and never goes in this repo.**
-- **Provider: not chosen yet.** `VPN_PROVIDER` / `VPN_AUTO_PORT_FORWARD` in `.env.example` default to `generic` / `false`. hotio has native support (including automatic port forwarding) for **Proton VPN** and **PIA**; any other WireGuard provider works in `generic` mode. A provider that supports port forwarding gives noticeably better torrent connectivity.
+- **Provider: Proton VPN** (paid plan, 24-month subscription taken in September 2026 — renewal due around September 2028). hotio supports Proton natively: `VPN_PROVIDER=proton` and `VPN_AUTO_PORT_FORWARD=true` make hotio request a forwarded port from Proton (via NAT-PMP) and set it as qBittorrent's listening port automatically, including when Proton assigns a new port after a reconnect. Port forwarding lets other peers connect to qBittorrent directly, which noticeably improves torrent connectivity.
+- **Generating the WireGuard config** (Proton account → Downloads → WireGuard configuration):
+  | Setting | Value | Why |
+  | --- | --- | --- |
+  | Platform | Linux (or Router) | Plain WireGuard config file, not tied to a Proton app |
+  | NAT-PMP (Port Forwarding) | **On** | Required for `VPN_AUTO_PORT_FORWARD=true` |
+  | [Moderate NAT](https://protonvpn.com/support/moderate-nat) | **Off** | Proton doesn't allow Moderate NAT and port forwarding on the same connection. It's meant for gaming and WebRTC calls, gives torrents less than a forwarded port does, and slightly weakens resistance to correlation attacks |
+  | Server | A **P2P**-labelled server, ideally in a nearby country | Proton only allows torrent traffic and port forwarding on P2P servers; a nearby server keeps latency and speed reasonable |
+  | NetShield | Off | Ad blocking isn't needed for qBittorrent and filtered DNS can interfere with tracker lookups |
+  | VPN Accelerator | On (Proton's default) | Performance only, no impact on privacy |
+
+  Save the file as `wg0.conf`. Each config uses one of the plan's simultaneous device slots while connected.
+- **Using the same subscription elsewhere**: Proton apps on personal devices are fine and independent of this setup. Other homelab traffic stays off the VPN on purpose — see [Future Work](#future-work) for the one possible exception (Prowlarr).
 
 ---
 
@@ -218,7 +230,7 @@ The app-level backups fit the "upgrade to app-level backups" approach in [docs/s
 ## Dependencies
 
 - **Synology DS420+** reachable over NFS, with the read/write rule for `192.168.0.31` on the `tv` share.
-- **VPN provider** account with WireGuard support (not chosen yet — see [VPN](#vpn-qbittorrent-only)).
+- **Proton VPN** paid subscription (renewal due around September 2028; if it lapses, qBittorrent stops working by design — the kill switch blocks traffic rather than falling back to the home IP). See [VPN](#vpn-qbittorrent-only).
 - **Jellyfin (CT 100)**: its libraries are re-created after the folder move. Seerr authenticates users against Jellyfin (`http://192.168.0.30:8096`). Radarr/Sonarr can optionally notify Jellyfin to refresh its library after imports (Settings → Connect → Emby/Jellyfin, using a Jellyfin API key).
 - **AdGuard Home** (planned): optional, for name-based access only.
 
@@ -249,8 +261,8 @@ Steps that change live data or the NAS are marked **(confirm first)**, per [AGEN
    ```
    `_netdev` tells systemd to wait for networking before mounting, so the VM doesn't hang at boot trying to mount before its network is up. Run `sudo mount -a` to mount it now, then check writes land as the right user: `sudo -u "#<PUID>" touch /data/.write-test && ls -ln /data/.write-test && rm /data/.write-test` (creates a file as the `arr` UID, shows its numeric owner, then removes it).
 6. **Folder layout (confirm first)**: create `torrents/{movies,shows}` and `media/`, then move `movies/` → `media/movies/` and `shows/` → `media/shows/` (instant, same share). Jellyfin's existing libraries stop finding files at this point, until step 12.
-7. **VM — stack**: create `/docker/appdata/`, copy [docker-compose.yml](docker-compose.yml) and [.env.example](.env.example) into a working directory (e.g. `/opt/arr-stack/`), rename `.env.example` to `.env`, and fill in the real values (UID/GID, time zone, pinned image tags, VPN provider). Create `/docker/appdata/seerr/` owned by UID 1000 (Seerr always runs as UID 1000 and ignores `PUID`).
-8. **VM — VPN config**: place the provider's WireGuard config at `/docker/appdata/qbittorrent/wireguard/wg0.conf` (skip for PIA, which hotio generates itself).
+7. **VM — stack**: create `/docker/appdata/`, copy [docker-compose.yml](docker-compose.yml) and [.env.example](.env.example) into a working directory (e.g. `/opt/arr-stack/`), rename `.env.example` to `.env`, and fill in the real values (UID/GID, time zone, pinned image tags). Create `/docker/appdata/seerr/` owned by UID 1000 (Seerr always runs as UID 1000 and ignores `PUID`).
+8. **VM — VPN config**: generate a Proton WireGuard config with the settings in [VPN](#vpn-qbittorrent-only) and place it at `/docker/appdata/qbittorrent/wireguard/wg0.conf`. Restrict it to its owner with `chmod 600` (it contains the WireGuard private key, so no other user on the VM should be able to read it).
 9. **Start**: `docker compose up -d` (starts every container in the background) from the working directory, then `docker compose ps` to confirm they're all running.
 10. **Verify the VPN before adding any indexer or torrent**: `docker exec qbittorrent curl -s https://ifconfig.me` runs `curl` inside the qBittorrent container and prints the public IP it's seen from. It must be the VPN's IP, not your home IP. Then confirm the kill switch: with the tunnel down, the same command must fail rather than print your home IP.
 11. **Configure the apps** (following the reference README and TRaSH Guides):
@@ -276,4 +288,11 @@ Steps that change live data or the NAS are marked **(confirm first)**, per [AGEN
 | 3 | NFS ownership | **Dedicated `arr` DSM user, No mapping** | Map all users to admin (simpler, but everything written ends up owned by `admin`) |
 | 4 | VPN integration | **hotio built-in WireGuard** | Gluetun sidecar (more providers, can route other containers too, but one more container and the Web UI ports move onto it); no VPN (home IP exposed) |
 | 5 | App scope | **Prowlarr, Radarr, Sonarr, qBittorrent, Bazarr, Seerr, FlareSolverr, Recyclarr** | Lidarr (no music library planned for now) |
-| 6 | VPN provider | **Open** | Proton VPN or PIA (native hotio support with port forwarding), or any WireGuard provider in `generic` mode |
+| 6 | VPN provider | **Proton VPN** (paid, 24 months) | PIA (also native in hotio, with port forwarding); any other WireGuard provider in hotio's `generic` mode |
+| 7 | VPN scope | **qBittorrent only** | Also routing Prowlarr/FlareSolverr (see [Future Work](#future-work)); whole VM or whole LAN through Proton (rejected: breaks LAN access to the VM, streaming services and Home Assistant integrations, and makes everything depend on Proton) |
+
+---
+
+## Future Work
+
+- **Prowlarr indexer traffic through the VPN (only if needed)**: if an indexer is blocked by the ISP or better not seen from the home IP, enable hotio's built-in Privoxy in the qBittorrent container (`PRIVOXY_ENABLED=true`, port 8118), which sends HTTP traffic through qBittorrent's WireGuard tunnel. Then add it in Prowlarr as an HTTP indexer proxy, tagged, and apply the tag only to the indexers that need it. Advantages: no extra container, per-indexer choice, easy to undo. Disadvantages: tagged indexers depend on the qBittorrent container being up; Cloudflare challenges VPN IPs more often, and some private trackers dislike VPN IPs. To check at that point: whether 8118 is reachable from other containers on the Docker network as-is, or also needs `VPN_EXPOSE_PORTS_ON_LAN=8118/tcp`. The alternative, if a whole-app VPN route is ever needed, is moving to a Gluetun sidecar (Decision 4 alternatives).
