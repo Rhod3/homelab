@@ -24,3 +24,4 @@ The goal of this project is to start with a simple, low-cost setup and progressi
   - [services/jellyfin/README.md](services/jellyfin/README.md) - Jellyfin media server & HW transcoding
   - [services/adguard-home/README.md](services/adguard-home/README.md) - AdGuard Home local DNS (planned)
   - [services/arr-stack/README.md](services/arr-stack/README.md) - Arr stack media automation (planned)
+  - [services/teslamate/README.md](services/teslamate/README.md) - TeslaMate Tesla data logger (planned)
