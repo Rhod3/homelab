@@ -12,7 +12,7 @@ This directory tracks all deployed and planned services within the homelab envir
 | **Home Assistant OS** | Synology VMM → Proxmox VE | Active (Migration Planned) | [services/home-assistant/README.md](home-assistant/README.md) |
 | **Jellyfin** | Proxmox VE (LXC, CT 100) | Deployed | [services/jellyfin/README.md](jellyfin/README.md) |
 | **AdGuard Home** | Proxmox VE | Planned | [services/adguard-home/README.md](adguard-home/README.md) |
-| **Arr Stack** (Prowlarr, Radarr, Sonarr, qBittorrent, Bazarr, Seerr, …) | Proxmox VE (Docker VM) | Planned | [services/arr-stack/README.md](arr-stack/README.md) |
+| **Arr Stack** (Prowlarr, Radarr, Sonarr, qBittorrent, Bazarr, Seerr, …) | Proxmox VE (Docker VM, VM 101) | Planned | [services/arr-stack/README.md](arr-stack/README.md) |
 | **Immich** | Proxmox VE | Planned | TBD |
 | **Paperless-ngx** | Proxmox VE | Planned | TBD |
 

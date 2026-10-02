@@ -36,7 +36,7 @@ The arr stack automates finding, downloading, renaming, and filing movies and TV
 ```mermaid
 flowchart LR
     subgraph Compute - HP Elite Mini 600 G9
-        subgraph DockerVM[Arr Docker VM - 192.168.0.31]
+        subgraph DockerVM[Arr Docker VM - VM 101 - 192.168.0.31]
             Seerr --> Radarr
             Seerr --> Sonarr
             Prowlarr --> Radarr
@@ -147,6 +147,7 @@ The stack grows the library automatically on a volume DSM already flags as low. 
 
 - **Host Platform**: Proxmox VE on HP Elite Mini 600 G9.
 - **Deployment Type**: VM running Debian (current stable), with Docker Engine + Compose plugin from [Docker's official apt repository](https://docs.docker.com/engine/install/debian/) (Debian's own `docker.io` package lags behind and doesn't ship the Compose plugin).
+- **VM ID**: 101 (Proxmox VE).
 - **Sizing**: 2 vCPU, 4 GB RAM, 32 GB disk on `vm-disks`. The apps are light; qBittorrent is the heaviest. Revisit if the library or torrent count grows large.
 - **Provisioning Method**: manual Debian install from an ISO on `nas-images` (or a Debian cloud image with cloud-init), rather than an automated "Docker VM" script, so the Docker install stays visible and documented. Exact method chosen at implementation time.
 - **Network**: static IP `192.168.0.31/24`, gateway `192.168.0.1` — next address in the `.30`–`.99` service range, see [hardware/networking.md](../../hardware/networking.md#static-ip-assignments).
@@ -253,7 +254,7 @@ Steps that change live data or the NAS are marked **(confirm first)**, per [AGEN
 
 1. **Synology — service account**: create DSM user `arr` with Read/Write on `tv` only. Over SSH, run `id arr` to get the account's numeric UID/GID for `PUID`/`PGID`.
 2. **Synology — NFS rule (confirm first)**: on the `tv` share (Control Panel → Shared Folder → `tv` → NFS Permissions), add a rule for `192.168.0.31`: Read/Write, Squash **No mapping**. Leave the existing `192.168.0.2` read-only rule untouched.
-3. **Proxmox — VM**: create the Debian VM on `vm-disks` (2 vCPU, 4 GB RAM, 32 GB), static IP `192.168.0.31/24`, gateway `192.168.0.1`. Add it to the `vzdump` schedule.
+3. **Proxmox — VM**: create the Debian VM as VM 101 on `vm-disks` (2 vCPU, 4 GB RAM, 32 GB), static IP `192.168.0.31/24`, gateway `192.168.0.1`. Add it to the `vzdump` schedule.
 4. **VM — Docker**: install Docker Engine + Compose plugin following [Docker's Debian instructions](https://docs.docker.com/engine/install/debian/), then run `docker run hello-world` to confirm the engine can pull and run a container.
 5. **VM — NFS mount**: install `nfs-common` (the NFS client tools Debian needs to mount NFS shares), create `/data`, and add this line to `/etc/fstab`:
    ```text
