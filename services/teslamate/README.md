@@ -2,7 +2,7 @@
 
 [TeslaMate](https://github.com/teslamate-org/teslamate) is a self-hosted data logger for Tesla vehicles. It polls the Tesla API and records drives, charging sessions, battery health, efficiency, and software updates into PostgreSQL, then shows them in a set of prebuilt Grafana dashboards. It can also publish live vehicle state over MQTT for home automation.
 
-**Status**: Planned. Not yet deployed. Hosting decided: community-scripts LXC (Option A, see [Decision Log](#decision-log)). [MQTT / Home Assistant integration](#mqtt--home-assistant-integration-open-decision) is deferred until Home Assistant has moved to Proxmox.
+**Status**: Deployed and verified on 2026-10-03. CT 102 runs TeslaMate 4.3.0 with Grafana, the car is logging, the nightly `pg_dump` and `vzdump` backups are in place, and a test restore passed — see [Deployment Steps](#deployment-steps). [MQTT / Home Assistant integration](#mqtt--home-assistant-integration-open-decision) is deferred until Home Assistant has moved to Proxmox.
 
 **Provisioning script**: [community-scripts.org — TeslaMate](https://community-scripts.org/scripts/teslamate) ([`ct/teslamate.sh`](https://github.com/community-scripts/ProxmoxVE/blob/main/ct/teslamate.sh) + [`install/teslamate-install.sh`](https://github.com/community-scripts/ProxmoxVE/blob/main/install/teslamate-install.sh)). Reviewed on 2026-10-02 against TeslaMate v4.3.0 and the upstream docs; see [What the Script Installs](#what-the-script-installs) and [Deviations from Upstream](#deviations-from-upstream).
 
@@ -68,7 +68,7 @@ TeslaMate's documentation recommends [Docker](https://docs.teslamate.org/docs/in
 | 2 | Prebuilt, signed images | Compiled from source on install and on every update | Updates take several minutes and need RAM (the reason for 4 GB). A failed build leaves the service stopped | Protected `vzdump` before every update |
 | 3 | Elixir 1.20.3 / OTP 29, pinned | Debian OTP 27 + **latest** Elixir | Works today (TeslaMate needs Elixir 1.19 or later). A future Elixir dropping OTP 27, or TeslaMate needing a newer OTP, would break an update | First thing to check if an update fails to build |
 | 4 | `teslamate/grafana` image, pinned to a tested version (13.2.3 at review time), with extra hardening (anonymous and basic auth off, alerting off, plugin preinstall off) | Latest Grafana from apt | A routine `apt upgrade` can move Grafana ahead of what the dashboards were tested with | `apt-mark hold grafana`, see [step 5](#deployment-steps) |
-| 5 | Dashboards in three separate flat folders | Main dashboard provider points at a folder that also contains `internal/` and `reports/`, and Grafana scans subfolders | **Likely** duplicate dashboard UIDs: warnings in Grafana's log, or dashboards landing in the wrong folder. Not yet verified | Check after install, [step 6](#deployment-steps) |
+| 5 | Dashboards in three separate flat folders | Main dashboard provider points at a folder that also contains `internal/` and `reports/`, and Grafana scans subfolders | **Confirmed 2026-10-03**: 4 dashboard UIDs found twice (3 in `internal/`, 1 in `reports/`). Grafana logs `the same UID is used more than once` every 30 s and then **disables writes for all three providers** (`provider has no database write permissions because of duplicates`), so dashboards can be missing or stop updating | Fixed in [step 6](#deployment-steps): single dashboard provider with `foldersFromFilesStructure` |
 | 6 | `TZ` set by the user | `TZ=UTC` | Wrong local timestamps in logs | Set to `Europe/Zurich` in `/opt/teslamate.env`, [step 4](#deployment-steps) |
 | 7 | `pg_dump` backup, copied off the host | No backup | — | `vzdump` + nightly `pg_dump`, see [Backup Requirements](#backup-requirements) |
 | 8 | App runs as a non-root user with all capabilities dropped | App runs as root inside the container | Mitigated by the container being unprivileged | Accepted |
@@ -91,6 +91,7 @@ PostgreSQL 17 is within upstream's supported range (16.7+, 17.3+, or 18). Upstre
 - **Time zone**: `Europe/Zurich` (`TZ` in `/opt/teslamate.env`).
 - **Config file**: `/opt/teslamate.env` in the container. It holds the encryption key and DB password, so it **never goes in this repo**.
 - **Tesla API**: default Owner API, with tokens generated outside TeslaMate (see [step 0](#deployment-steps)). The Fleet API is optional and not used.
+- **Vehicles**: the Tesla account has two cars; **only the car with VIN ending `433499` is logged** and it is **first** in TeslaMate's **Settings → Car Order**, so it's the default in Grafana's car dropdowns and comes first on the Overview. The other car stays in the database with **Settings → Data Collection → Enabled** off. See [Vehicles](#vehicles) for why it isn't deleted.
 
 ### Network Ports
 
@@ -121,6 +122,23 @@ TeslaMate publishes live vehicle state (location, battery level, charging state,
 
 ---
 
+## Vehicles
+
+The Tesla account TeslaMate signs in with has two cars. Only one is logged. VINs are shortened to their last 6 characters in this repo; the full VIN is visible in TeslaMate and Grafana.
+
+| VIN | Data collection | Car Order | Name shown |
+| --- | --- | --- | --- |
+| VIN ending `433499` | **Enabled**: the only car logged | **First** | `???` in TeslaMate, `VIN …433499` (full VIN) in Grafana |
+| Second car on the account | **Disabled** | Second | `???` in TeslaMate, `VIN …` in Grafana |
+
+- **Names**: TeslaMate takes each car's name from Tesla (touchscreen or app) and shows `???` when none is set; Grafana falls back to the VIN. Both cars are deliberately left unnamed. If one is named later, TeslaMate picks it up the next time it starts (at the latest after the nightly 05:00 `vzdump` restart).
+- **Disabling** (TeslaMate **Settings** → the car's tab → **Data Collection → Enabled** off) takes effect immediately: TeslaMate stops polling that car entirely, so it can't keep it awake and publishes nothing about it over MQTT. The setting is stored in the database and survives restarts, updates and restores.
+- **Do not delete the second car from the database** (upstream's "Remove a vehicle" SQL): every time TeslaMate starts, it reads the account's car list and re-creates any car it doesn't know, with data collection **enabled** by default. Because `vzdump` restarts the container every night, the car would be logged again from the next morning.
+- **Grafana**: the dashboards list every car in the database, so the second car remains in the dropdowns, with the few hours logged on 2026-10-03 before it was disabled. Ordering the car with VIN ending `433499` first makes it the default selection. Hiding the second car completely is listed under [Future Work](#future-work).
+- **After a restore or a fresh install**: check the car order and that the second car still has data collection off. A fresh sign-in on a new database starts with both cars enabled.
+
+---
+
 ## Backup Requirements
 
 | What | Method | Target |
@@ -148,7 +166,7 @@ TeslaMate publishes live vehicle state (location, battery level, charging state,
 ## Security Considerations
 
 - **No authentication on the TeslaMate UI (port 4000)**. Anyone who can reach it can see the car's status and change TeslaMate's settings, and the app holds the Tesla API tokens. Grafana, which shows the full location history, has its own login. **LAN only, never port-forwarded.** Remote access stays out of scope until Decision 5 in [docs/network-strategy.md](../../docs/network-strategy.md) is made. Upstream recommends a VPN/tunnel, or a reverse proxy with authentication.
-- **Grafana starts as `admin`/`admin`**: change the password on first login (step 6).
+- **Grafana starts as `admin`/`admin`**: change the password on first login (step 7).
 - **Optional origin check**: `CHECK_ORIGIN=http://192.168.0.32:4000` makes TeslaMate reject browser connections opened by other websites. Add the DNS name to this comma-separated list once AdGuard Home provides one. Don't use `CHECK_ORIGIN=true` on its own: it compares against `VIRTUAL_HOST`, which defaults to `localhost`, so access by IP would break.
 - **Secrets stay in the container**: `/opt/teslamate.env` (mode 600) and the provisioned Grafana data source file contain the DB password. Copies go in the password manager only, per [AGENTS.md](../../AGENTS.md#implementation-standards).
 - **Script trust**: the script fetches its helper code (`build.func`) from the `main` branch of `community-scripts/core` and runs it as root on the Proxmox host. Re-read the script right before running it.
@@ -160,28 +178,52 @@ TeslaMate publishes live vehicle state (location, battery level, charging state,
 
 Commands run on the **Proxmox host** shell unless stated otherwise.
 
-0. **Prepare**: generate the Tesla access and refresh tokens with tesla_auth or the iOS app (see [Dependencies](#dependencies)). Keep them at hand for step 7; they don't need to be stored anywhere.
-1. **Re-check the script**: open [`ct/teslamate.sh`](https://github.com/community-scripts/ProxmoxVE/blob/main/ct/teslamate.sh) and [`install/teslamate-install.sh`](https://github.com/community-scripts/ProxmoxVE/blob/main/install/teslamate-install.sh) and compare them with [What the Script Installs](#what-the-script-installs). Note any change.
-2. **Create the container**:
+0. ✅ **Prepare**: generate the Tesla access and refresh tokens with tesla_auth or the iOS app (see [Dependencies](#dependencies)). Keep them at hand for step 8; they don't need to be stored anywhere. Done 2026-10-03 with tesla_auth v0.15.0 on macOS: Gatekeeper blocks it (not notarized by Apple), so the download was checked against the release's published `.sha256` with `shasum -a 256`, then allowed with `xattr -dr com.apple.quarantine <folder>`.
+1. ✅ **Re-check the script**: open [`ct/teslamate.sh`](https://github.com/community-scripts/ProxmoxVE/blob/main/ct/teslamate.sh) and [`install/teslamate-install.sh`](https://github.com/community-scripts/ProxmoxVE/blob/main/install/teslamate-install.sh) and compare them with [What the Script Installs](#what-the-script-installs). Note any change. Done 2026-10-03: unchanged since the 2026-10-02 review (last script commit 2026-10-01, a build-path fix for v4.3.0).
+2. ✅ **Create the container**:
    ```bash
    bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/teslamate.sh)"
    ```
    This downloads the container script and runs it as root, which is what lets it create the container. Choose **Advanced Settings** and set: container ID `102`, hostname `teslamate`, unprivileged (yes), disk `16` GB on `vm-disks`, 2 cores, 4096 MB RAM, static IP `192.168.0.32/24`, gateway `192.168.0.1`. The build takes several minutes.
-3. **Check it started**: `pct exec 102 -- systemctl status teslamate grafana-server` runs `systemctl status` inside CT 102 and shows whether both services are running.
-4. **Fix the app config** inside the container (`pct enter 102` opens a root shell in it):
+3. ✅ **Check it started**: `pct exec 102 -- systemctl status teslamate grafana-server` runs `systemctl status` inside CT 102 and shows whether both services are running. Done 2026-10-03: both `active (running)`; TeslaMate 4.3.0 on Erlang/OTP 27, PostgreSQL 17.11, MQTT connected to the local broker. Grafana uses ~620 MB RAM at idle, mostly its bundled data-source plugins. Grafana logged `provisioning.dashboard` messages every 30 s, likely [Deviation 5](#deviations-from-upstream) — checked in step 6.
+4. ✅ **Fix the app config** inside the container (`pct enter 102` opens a root shell in it):
    - In `/opt/teslamate.env`, replace `TZ=UTC` with `TZ=Europe/Zurich`. Optionally add `CHECK_ORIGIN=http://192.168.0.32:4000` (see [Security Considerations](#security-considerations)).
    - Run `systemctl restart teslamate` to apply the changes.
    - Copy `ENCRYPTION_KEY` and `DATABASE_PASS` from the file into the password manager.
-5. **Pin Grafana**: `apt-mark hold grafana` tells apt not to upgrade Grafana during routine `apt upgrade` runs, so it only moves when you choose. To upgrade it later, check which version upstream pins in [`grafana/Dockerfile`](https://github.com/teslamate-org/teslamate/blob/main/grafana/Dockerfile), then run `apt-mark unhold grafana && apt install grafana && apt-mark hold grafana`.
-6. **Grafana** (`http://192.168.0.32:3000`):
+   - Done 2026-10-03: `TZ=Europe/Zurich` and `CHECK_ORIGIN=http://192.168.0.32:4000` set; log timestamps confirmed in local time after the restart.
+5. ✅ **Pin Grafana**: `apt-mark hold grafana` tells apt not to upgrade Grafana during routine `apt upgrade` runs, so it only moves when you choose. To upgrade it later, check which version upstream pins in [`grafana/Dockerfile`](https://github.com/teslamate-org/teslamate/blob/main/grafana/Dockerfile), then run `apt-mark unhold grafana && apt install grafana && apt-mark hold grafana`.
+6. ✅ **Grafana dashboard fix** ([Deviation 5](#deviations-from-upstream)), inside the container. Applied 2026-10-03.
+   - Keep the script's version: `cp /etc/grafana/provisioning/dashboards/teslamate.yml /root/teslamate-dashboards.yml.orig`. It goes in `/root` because Grafana loads every `.yml` file in the provisioning folder.
+   - Replace `/etc/grafana/provisioning/dashboards/teslamate.yml` with a **single provider** that builds Grafana folders from the directory layout:
+     ```yaml
+     apiVersion: 1
+
+     providers:
+       - name: "teslamate"
+         orgId: 1
+         type: file
+         disableDeletion: false
+         allowUiUpdates: true
+         updateIntervalSeconds: 86400
+         options:
+           path: /opt/teslamate/grafana/dashboards
+           foldersFromFilesStructure: true
+     ```
+     `folder` / `folderUid` are omitted on purpose: Grafana doesn't allow them together with `foldersFromFilesStructure`. Result: main dashboards at the top level, plus `internal` and `reports` folders. Upstream's layout (TeslaMate / Internal / Reports) differs, but only cosmetically.
+   - `systemctl restart grafana-server`, wait a minute, then `journalctl -u grafana-server --since "-1 min" | grep -c "same UID"` must print `0`. Verified 2026-10-03: `0`, no other provisioning warnings.
+   - Survives `update`: the script's update replaces `/opt/teslamate` but never touches `/etc/grafana`, and new or removed dashboards in future releases are picked up automatically.
+   - Alternative not chosen: three flat providers as upstream, with the main dashboards copied into their own folder (`rsync` with subfolders excluded) after every update. Matches upstream's layout but adds a manual step to each update.
+7. ✅ **Grafana** (`http://192.168.0.32:3000`):
    - Log in as `admin`/`admin` and set a new password (store it in the password manager).
-   - Check the dashboards appear under the **TeslaMate**, **Internal**, and **Reports** folders without duplicates.
-   - In the container, `journalctl -u grafana-server | grep -i uid` searches Grafana's log for duplicate-UID warnings ([Deviation 5](#deviations-from-upstream)). If there are any, record the fix here.
-7. **TeslaMate** (`http://192.168.0.32:4000`):
+   - Check the dashboards appear once each: main dashboards at the top level, plus the `internal` and `reports` folders. Delete any empty leftover folders (**TeslaMate**, **Internal**, **Reports**) from the first provisioning run.
+   - **Connections → Data sources → TeslaMate → Save & test** must report a working database connection.
+   - Done 2026-10-03: admin password changed, Save & test successful, every dashboard listed once, no leftover folders.
+8. ✅ **TeslaMate** (`http://192.168.0.32:4000`):
    - Paste the access and refresh tokens to sign in.
    - Under **Settings → URLs**, set Web App to `http://192.168.0.32:4000` and Dashboards to `http://192.168.0.32:3000`, so the links between the two apps work.
    - Set units and language. Confirm the car appears and its state updates.
-8. **Nightly database dump** (inside the container):
+   - Done 2026-10-03: signed in with the Owner API tokens, URLs set. Both cars on the account appeared; data collection was turned off for the one not to be logged, and the car with VIN ending `433499` was moved first in **Settings → Car Order** (see [Vehicles](#vehicles)).
+9. ✅ **Nightly database dump** (inside the container):
    - `install -d -m 700 /var/backups/teslamate` creates the dump folder, readable by root only (the dump contains location history and encrypted tokens).
    - Create `/etc/cron.d/teslamate-pgdump` with:
      ```text
@@ -190,9 +232,11 @@ Commands run on the **Proxmox host** shell unless stated otherwise.
      Every night at 04:30, this runs `pg_dump` as the `postgres` user to export the `teslamate` database as plain SQL. It writes to a temporary file and only replaces the previous dump if the export succeeds, so a failed run never overwrites a good dump with an empty one.
    - Check `cron` is running with `systemctl status cron`. If it's missing, install it with `apt install cron`.
    - Test once by running the command by hand, then `ls -lh /var/backups/teslamate/` to see that the dump is there and not empty.
-9. **Backups**: add CT 102 to the existing `vzdump` job (Datacenter → Backup → edit the job → add CT 102). Run it once manually and check the log.
-10. **Test restore** using the procedure in [services/proxmox.md](../proxmox.md#verification): restore as CT 900 with `net0` removed, then check `systemctl status teslamate postgresql` and that `/var/backups/teslamate/teslamate.bck` is present. TeslaMate will log connection errors to Tesla because the copy has no network; that's expected.
-11. **Docs**: mark the service Deployed in [services/README.md](../README.md), move the [hardware/networking.md](../../hardware/networking.md#static-ip-assignments) entry from reserved to deployed, add CT 102 to the backup job table in [services/proxmox.md](../proxmox.md#backup-jobs), and record the results of steps 6, 9, and 10 here.
+   - Done 2026-10-03: `cron` present in the container; first manual dump 54 KB, starting with `-- PostgreSQL database dump`.
+   - Note: recent PostgreSQL releases add a `\restrict <key>` line near the top of every dump (a security measure for restores). Restore it with an equally recent `psql`. Current Debian packages and upstream's `postgres:18` image qualify; an older `psql` stops at that line.
+10. ✅ **Backups**: add CT 102 to the existing `vzdump` job (Datacenter → Backup → edit the job → add CT 102). Run it once manually and check the log. Done 2026-10-03: CT 102 added to the 05:00 job; first archive `vzdump-lxc-102-2026_10_03-13_01_46.tar.zst` (5.0 GiB of container data before compression).
+11. ✅ **Test restore** using the procedure in [services/proxmox.md](../proxmox.md#verification): restore as CT 900 with `net0` removed, then check `systemctl status teslamate postgresql` and that `/var/backups/teslamate/teslamate.bck` is present. TeslaMate will log connection errors to Tesla because the copy has no network; that's expected. Removing `net0` matters more here than for Jellyfin: the copy holds the same Tesla tokens and would poll the car alongside the real instance. Done 2026-10-03: `teslamate`, `postgresql` and `grafana-server` all `active`, dump present, and `select count(*) from cars;` returned the restored rows (the database itself was restored, not just files). CT 900 destroyed afterwards.
+12. ✅ **Docs**: mark the service Deployed in [services/README.md](../README.md), move the [hardware/networking.md](../../hardware/networking.md#static-ip-assignments) entry from reserved to deployed, add CT 102 to the backup job table in [services/proxmox.md](../proxmox.md#backup-jobs), and record the results of steps 7, 10, and 11 here.
 
 ---
 
@@ -217,6 +261,8 @@ The script's `update` command doesn't take a backup and rebuilds from source. Fo
 | 3 | Grafana version | **Held with `apt-mark hold`**, upgraded deliberately | Let apt upgrade it freely (risks dashboard breakage) |
 | 4 | Backups | **`vzdump` (stop mode) + nightly `pg_dump`** | `vzdump` only (not portable to another install method) |
 | 5 | MQTT / Home Assistant | **Deferred** until Home Assistant runs on Proxmox, see [MQTT](#mqtt--home-assistant-integration-open-decision) | — |
+| 6 | Grafana dashboard duplicates ([Deviation 5](#deviations-from-upstream)) | **Single provider with `foldersFromFilesStructure: true`**: no maintenance, survives updates | Three flat providers as upstream, with a copy step after every update (same layout as upstream, but one more manual step) |
+| 7 | Second car on the Tesla account | **Data collection off, kept in the database, ordered second**; it stays visible in Grafana's dropdowns | Delete it with SQL (re-created with logging **on** at the next start, i.e. every night after the `vzdump` restart); edit the dashboard queries (about 20 dashboards, overwritten on every update); sign TeslaMate in with a separate Tesla account that only has driver access to the logged car (durable, but needs a second account and testing) |
 
 ---
 
@@ -225,4 +271,5 @@ The script's `update` command doesn't take a backup and rebuilds from source. Fo
 - **MQTT decision** once Home Assistant runs on Proxmox.
 - **Name-based access** via AdGuard Home; then extend `CHECK_ORIGIN` and the URLs in TeslaMate **Settings → URLs**.
 - **Remote access** (e.g. checking a charge from outside): only through the remote access approach chosen in [docs/network-strategy.md](../../docs/network-strategy.md), never by port-forwarding 4000/3000.
+- **Hide the second car completely** (only if the extra dropdown entry becomes a nuisance): sign TeslaMate in with a separate Tesla account that only has driver access to the car with VIN ending `433499`, then delete the other car with upstream's SQL. Test first that a driver-access account works with TeslaMate. Optionally, the few hours of data logged for the second car can be deleted with SQL while keeping its `cars` row (after a fresh backup).
 - **Move to Docker (Option B)** if the source-build path becomes fragile: restore the nightly `teslamate.bck` with upstream's restore procedure and reuse the same `ENCRYPTION_KEY`.

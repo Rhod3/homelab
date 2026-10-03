@@ -19,7 +19,7 @@ Proxmox Virtual Environment (VE) serves as the core compute virtualization platf
 
 - **Home Assistant OS VM**: (Migration target from Synology VMM)
 - **Jellyfin**: Deployed as unprivileged LXC (CT 100) with Intel Quick Sync GPU passthrough — see [services/jellyfin/README.md](jellyfin/README.md).
-- **TeslaMate** (planned, CT 102, `192.168.0.32`): unprivileged LXC from the community-scripts TeslaMate script — see [services/teslamate/README.md](teslamate/README.md).
+- **TeslaMate**: Deployed as unprivileged LXC (CT 102, `192.168.0.32`) from the community-scripts TeslaMate script — see [services/teslamate/README.md](teslamate/README.md).
 - **Future services** (MQTT/Zigbee2MQTT, AdGuard Home, Immich, Paperless-ngx, etc.): each deployed as its own dedicated LXC or VM, sized and provisioned individually rather than consolidated into a shared container host — see [services/README.md](README.md#service-status-matrix) for current status.
 - **Arr Stack Docker VM** (planned, VM 101, `192.168.0.31`): the one deliberate exception to the rule above — a single Debian VM running Docker Compose for Prowlarr, Radarr, Sonarr, qBittorrent, and related apps. Justified because the stack is one logical service: the apps must share a single filesystem for hardlinks, are wired together by API keys, and are deployed and updated together. A VM rather than LXC(s) because the apps need **read/write** NFS access, which unprivileged LXCs can't mount (see below) and which the host-bind-mount workaround complicates with UID shifting. This is not a general-purpose Docker host; other services still get their own LXC/VM. See [services/arr-stack/README.md](arr-stack/README.md).
 
@@ -68,7 +68,7 @@ Scheduled `vzdump` jobs, configured under **Datacenter → Backup** and written 
 | Setting | Value | Notes |
 | --- | --- | --- |
 | Node | `pve` | |
-| Guests | CT 100 (Jellyfin) | Home Assistant is deliberately excluded — it uses its own app-level backups |
+| Guests | CT 100 (Jellyfin), CT 102 (TeslaMate, added 2026-10-03) | Home Assistant is deliberately excluded — it uses its own app-level backups |
 | Storage | `nas-backups` | |
 | Mode | `stop` | Clean shutdown before the archive is taken, so Jellyfin's SQLite DB is consistent rather than crash-consistent. Costs ~30 s of downtime per run |
 | Compression | ZSTD | |
@@ -107,3 +107,4 @@ Set in `/etc/vzdump.conf` on `pve`. It is required for backing up **unprivileged
   pct stop 900 && pct destroy 900   # destroy refuses a running container
   ```
   Expected noise: with no network, apps log connection errors, e.g. Jellyfin's plugin repository check throws an `HttpClient` stack trace. This is harmless.
+- **CT 102 (TeslaMate)**: first archive 2026-10-03 (5.0 GiB of container data). Test restore passed the same day with the procedure above: all services active and the PostgreSQL data queryable — see [services/teslamate/README.md](teslamate/README.md#deployment-steps).

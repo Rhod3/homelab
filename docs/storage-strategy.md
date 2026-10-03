@@ -77,7 +77,7 @@ flowchart TD
 - **Scope**: whole VM/LXC disk and config snapshot. Crash-consistent, not application-consistent.
 - **Target**: dedicated `proxmox_backups` share on the Synology DS420+, separate from `homeassistant_backups`.
 - **Secondary backup**: reuse the existing Hyper Backup path to external/offsite storage rather than introducing a second mechanism.
-- **Status**: Active for Jellyfin (CT 100) since 2026-09-27, in `stop` mode. Job settings, retention, and the `tmpdir` fix needed for unprivileged LXCs on root-squashed NFS are in [services/proxmox.md](../services/proxmox.md#backup-jobs). Hyper Backup of `proxmox_backups` is not yet documented as configured. Until it is, backups and media share the same NAS, so a Synology failure would lose both.
+- **Status**: Active for Jellyfin (CT 100) since 2026-09-27 and TeslaMate (CT 102) since 2026-10-03, both in `stop` mode. Job settings, retention, and the `tmpdir` fix needed for unprivileged LXCs on root-squashed NFS are in [services/proxmox.md](../services/proxmox.md#backup-jobs). Hyper Backup of `proxmox_backups` is not yet documented as configured. Until it is, backups and media share the same NAS, so a Synology failure would lose both.
 
 ### Upgrading to App-Level Backups
 
