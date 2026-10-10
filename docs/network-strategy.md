@@ -160,6 +160,8 @@ Run a reverse proxy (e.g. Caddy/Traefik/Nginx Proxy Manager) on a DMZ-style netw
 
 **Recommendation**: Proposition A (VPN-only) as the default; consider Proposition B later, and only for specific low-risk services, if VPN-only proves inconvenient for non-technical household members.
 
+**Decision (2026-10-10)**: Proposition A, as a **Tailscale subnet router** in a dedicated LXC on Proxmox, advertising the current flat LAN. Status: planned — see [services/tailscale/README.md](../services/tailscale/README.md). It doesn't depend on VLANs, so it's being done ahead of Phases 1–2 below; the phases stay independent and reversible.
+
 ---
 
 ## Suggested Phased Rollout
@@ -181,5 +183,6 @@ Each phase should be individually reversible: stop after any phase and the netwo
 ## Open Questions / Explicitly Not Decided Here
 
 - Actual subnet ranges, VLAN-to-subnet mapping, and hostnames are intentionally left as placeholders (`TBD`) — these should be assigned at implementation time, not speculated in a strategy doc, per [AGENTS.md](../AGENTS.md#implementation-standards).
+  - Constraint for that choice: avoid very common home ranges such as `192.168.0.0/24` and `192.168.1.0/24`. A remote network using the same range blocks access through the Tailscale subnet route (see [services/tailscale/README.md](../services/tailscale/README.md#known-limitations)).
 - Specific hardware SKUs (which UniFi Gateway model, which managed switch) are out of scope here; that belongs in [hardware/networking.md](../hardware/networking.md) once a Decision 2 proposition is chosen.
 - Firewall rule sets between VLANs (what's allowed to talk to what) should be documented once a segmentation model is chosen, not before.
