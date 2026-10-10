@@ -109,3 +109,11 @@ Set in `/etc/vzdump.conf` on `pve`. It is required for backing up **unprivileged
   Expected noise: with no network, apps log connection errors, e.g. Jellyfin's plugin repository check throws an `HttpClient` stack trace. This is harmless.
 - **VM 101 (arr stack)**: nightly archives present since 2026-09-30 (`pvesm list nas-backups --vmid 101`), ~2.8 GB each once the stack was configured. Only the VM's own disk is captured — the `/data` NFS mount of the `tv` share is not a VM disk, so media is never included. The 05:00 shutdown/restart was confirmed harmless: the NFS mount, all containers and the VPN tunnel came back on their own. A test restore has not been done yet — see [services/arr-stack/README.md](arr-stack/README.md#future-work).
 - **CT 102 (TeslaMate)**: first archive 2026-10-03 (5.0 GiB of container data). Test restore passed the same day with the procedure above: all services active and the PostgreSQL data queryable — see [services/teslamate/README.md](teslamate/README.md#deployment-steps).
+
+---
+
+## Known Issues
+
+| Issue | Status | Details |
+| --- | --- | --- |
+| Onboard NIC (`nic0`, Intel I219 / `e1000e`) locks up with `Detected Hardware Unit Hang`, taking the host and every guest off the network until a restart. Seen 2026-10-10 (~70 min outage) | Fix applied and verified after a reboot, 2026-10-10 (TSO/GSO/GRO off via `post-up` on `vmbr0`). Monitoring for recurrence | [hardware/compute.md](../hardware/compute.md#e1000e-detected-hardware-unit-hang-onboard-nic-lock-up) |
