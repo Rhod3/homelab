@@ -62,7 +62,7 @@ The host mounts `tv` over NFS itself, then passes it into the Jellyfin LXC as a 
     | Shows | `/mnt/tv/media/series` | 19 series, 439 episodes |
 
     `/mnt/tv/torrents/` (downloads in progress) is deliberately **not** a library. CT 100's mount (`mp0`) didn't change. Because the libraries were re-created, each user's library access must be checked under **Dashboard → Users → Access** if *Enable access to all libraries* is off.
-12. ✅ Radarr and Sonarr notify Jellyfin after every import, upgrade, rename or delete (**Connect → Emby / Jellyfin**, host `192.168.0.30:8096`, *Update Library* on), using a Jellyfin API key named `arr-stack` (Dashboard → API Keys). Needed because real-time monitoring doesn't see files written over NFS by another machine; without it, new items would only appear at the scheduled library scan.
+12. ✅ Radarr and Sonarr notify Jellyfin after every import, upgrade, rename or delete (**Connect → Emby / Jellyfin**, host `192.168.0.30:8096`, *Update Library* on), using a Jellyfin API key named `arr-stack` (Dashboard → API Keys). Needed because real-time monitoring doesn't see files written over NFS by another machine; without it, new items would only appear at the scheduled library scan. Both connections also set **Map Paths From** `/data/media/` **To** `/mnt/tv/media/`. Radarr/Sonarr send the path *as they see it* (`/data/media/...` on VM 101), and Jellyfin silently ignores a path that isn't inside one of its libraries. Without the mapping, the first real download (2026-10-10) was imported by Radarr but didn't appear in Jellyfin. The connection's **Test** button only checks the host and API key, so it doesn't catch a path mismatch.
 
 ---
 
