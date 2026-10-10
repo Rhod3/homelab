@@ -54,6 +54,15 @@ The host mounts `tv` over NFS itself, then passes it into the Jellyfin LXC as a 
 8. ✅ Tuned transcoding settings and resolved a transcode-cache disk-space issue found during verification — see [Transcoding Configuration](#transcoding-configuration) below for the full settings and root cause.
 9. ✅ Created a `vzdump` backup job for CT 100 (Datacenter → Backup, `stop` mode, ZSTD, `nas-backups`). The first run failed with `Permission denied` on the `.tmp` staging folder (root squash + unprivileged UID mapping); fixed by setting `tmpdir: /var/tmp` in `/etc/vzdump.conf` — see [services/proxmox.md](../proxmox.md#node-wide-setting-tmpdir-vartmp). Second run succeeded on 2026-09-27: 1.81 GB archive, 30 s downtime.
 10. ✅ Tested a restore on 2026-09-27: restored the archive as CT 900 with `net0` removed (the copy keeps CT 100's static IP and MAC), confirmed Jellyfin started with `jellyfin.db` and library data intact, then destroyed CT 900. See [services/proxmox.md](../proxmox.md#verification) for the reusable procedure.
+11. ✅ Libraries moved for the arr stack (2026-10-10). The arr stack reorganized the `tv` share (`media/` + `torrents/`) and renamed the library to `Title (Year) [tmdbid-…]` / `Title (Year) [tvdbid-…]` — see [services/arr-stack/README.md](../arr-stack/README.md#storage-plan). Both libraries were **deleted and re-created** (rather than edited) at the new paths:
+
+    | Library | Folder | Content after the first scan |
+    | --- | --- | --- |
+    | Movies | `/mnt/tv/media/movies` | 53 movies |
+    | Shows | `/mnt/tv/media/series` | 19 series, 439 episodes |
+
+    `/mnt/tv/torrents/` (downloads in progress) is deliberately **not** a library. CT 100's mount (`mp0`) didn't change. Because the libraries were re-created, each user's library access must be checked under **Dashboard → Users → Access** if *Enable access to all libraries* is off.
+12. ✅ Radarr and Sonarr notify Jellyfin after every import, upgrade, rename or delete (**Connect → Emby / Jellyfin**, host `192.168.0.30:8096`, *Update Library* on), using a Jellyfin API key named `arr-stack` (Dashboard → API Keys). Needed because real-time monitoring doesn't see files written over NFS by another machine; without it, new items would only appear at the scheduled library scan.
 
 ---
 
@@ -87,5 +96,4 @@ Hit during initial verification, before the **Throttle Transcodes** / **Delete s
 ## Future Work
 
 - **App-level config backup** (optional): the `vzdump` job (step 9) already covers the config/DB, but only as a Proxmox-format whole-container archive. Consider adding a portable copy if Jellyfin might later move off LXC (e.g. to Docker). Options: Jellyfin's built-in backup (**Dashboard → Backups**, believed to be available from 10.11 — check CT 100's version first), or a host-side script that stops the service and tars `/etc/jellyfin` + `/var/lib/jellyfin` via `pct exec`. See [docs/storage-strategy.md](../../docs/storage-strategy.md#upgrading-to-app-level-backups).
-- **Library path changes for the arr stack** (planned): the arr stack will move `movies/` and `shows/` under `media/` in the `tv` share. CT 100's `mp0` mount is unchanged, but the two libraries get re-created at `/mnt/tv/media/movies` and `/mnt/tv/media/shows` (watched status may reset) — see [services/arr-stack/README.md](../arr-stack/README.md#impact-on-jellyfin-ct-100).
 - **Full hardware decode+tonemap pipeline**: confirm (via a fresh transcode log) that hardware decoding and tone-mapping are actually engaging for HDR/HEVC sources now that the relevant checkboxes are enabled, not just the encode step.

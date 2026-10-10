@@ -23,5 +23,5 @@ The goal of this project is to start with a simple, low-cost setup and progressi
   - [services/home-assistant/README.md](services/home-assistant/README.md) - Home Assistant OS setup & migration
   - [services/jellyfin/README.md](services/jellyfin/README.md) - Jellyfin media server & HW transcoding
   - [services/adguard-home/README.md](services/adguard-home/README.md) - AdGuard Home local DNS (planned)
-  - [services/arr-stack/README.md](services/arr-stack/README.md) - Arr stack media automation (planned)
+  - [services/arr-stack/README.md](services/arr-stack/README.md) - Arr stack media automation
   - [services/teslamate/README.md](services/teslamate/README.md) - TeslaMate Tesla data logger

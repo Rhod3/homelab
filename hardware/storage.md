@@ -49,7 +49,7 @@ Static IP is configured directly in DSM (Control Panel → Network → Network I
 | **Volume Encryption** | Disabled |
 | **Volume** | Volume 1 |
 | **File System** | Btrfs |
-| **Volume Capacity** | 6.1 TB total — 4.9 TB used, 1.2 TB free (~80% utilized) |
+| **Volume Capacity** | 6.1 TB total — 4.8 TB used, 1.4 TB free (~78% utilized) as of 2026-10-10, after the library cleanup during the arr stack deployment freed ~200 GB of duplicates and leftovers |
 | **Data Scrubbing** | Scheduled periodically; last completed 2026-08-27 |
 
 > **Capacity Warning**: DSM currently flags Volume 1 as running low on free space (~20% free) and recommends adding or replacing drives with larger capacity. Factor this in now that `proxmox_backups` and `proxmox_images` are provisioned below — if backup/template volume grows significant, revisit capacity planning rather than assuming headroom.
@@ -60,14 +60,12 @@ Since the volume is confirmed Btrfs, **data checksums are supported** and can be
 
 ## Primary Shared Folders
 
-- `tv/`: Contains streaming media — the only media share, used by the planned Jellyfin deployment (see [services/jellyfin/README.md](../services/jellyfin/README.md)).
+- `tv/`: Contains streaming media — the only media share. Read by Jellyfin (see [services/jellyfin/README.md](../services/jellyfin/README.md)) and written by the arr stack (see [services/arr-stack/README.md](../services/arr-stack/README.md#storage-plan)). Layout since 2026-10-04: `media/{movies,series}` (the library) and `torrents/{movies,series}` (qBittorrent downloads), both in this one share so imports are hardlinked instead of copied.
 - `homeassistant_backups/`: Dedicated share reserved for automated Home Assistant backups.
 - `proxmox_backups/` (**Created**, in use): NFS target for scheduled `vzdump` backups of all VMs/LXCs except Home Assistant. See [services/proxmox.md](../services/proxmox.md#backup-jobs). Current footprint: CT 100 at ~1.8 GB per archive, up to 16 archives under the current retention (~29 GB worst case). Root squash on this export is why Proxmox needs `tmpdir: /var/tmp` to back up unprivileged LXCs.
 - `proxmox_images/` (**Created**): NFS target for Proxmox ISO images and LXC container templates, offloaded from local compute storage. See [services/proxmox.md](../services/proxmox.md#storage-configuration).
 
 All four shares use `snake_case` naming — consistent across the board.
-
-> **Planned change (arr stack)**: the `tv` share will be reorganized into `torrents/{movies,shows}` + `media/{movies,shows}` (existing `movies/` and `shows/` move under `media/`), gain a **read/write** NFS rule for the arr Docker VM (`192.168.0.31`, squash: No mapping), and a dedicated `arr` DSM user with read/write on `tv` only. The Proxmox host's read-only rule for Jellyfin stays unchanged. See [services/arr-stack/README.md](../services/arr-stack/README.md#storage-plan). Nothing has been changed on the Synology yet.
 
 ---
 
@@ -90,9 +88,17 @@ Access control follows a least-privilege pattern, scoped per share. The mechanis
 
 ### `tv` (current state, NFS enabled and host-restricted)
 
-- **NFS is enabled** on this share, exported **Read Only** to the **Proxmox host** (`192.168.0.2`) only. It remains accessible over SMB/CIFS for general/family LAN access as before.
-- **Squash: Map all users to admin.** Required because NFS permission checks happen server-side against the caller's real UID — an unprivileged LXC's mapped UID (~100000+, not the container's apparent `root`) doesn't correspond to any NAS user, so requests were rejected outright regardless of the share's permissive (`777`) file modes. Squashing every caller to one known, readable account sidesteps the mismatch. Safe here since the export is read-only.
+- **NFS is enabled** on this share with **two rules**, one per client. It remains accessible over SMB/CIFS for general/family LAN access as before.
+
+  | Client | Privilege | Squash | Used by |
+  | --- | --- | --- | --- |
+  | Proxmox host (`192.168.0.2`) | Read Only | Map all users to admin | Host mount bind-passed into Jellyfin CT 100 |
+  | Arr Docker VM (`192.168.0.31`) | Read/Write | No mapping | Arr stack downloads, imports and renames (added 2026-09) |
+
+- **Rule for `192.168.0.2` — Squash: Map all users to admin.** Required because NFS permission checks happen server-side against the caller's real UID — an unprivileged LXC's mapped UID (~100000+, not the container's apparent `root`) doesn't correspond to any NAS user, so requests were rejected outright regardless of the share's permissive (`777`) file modes. Squashing every caller to one known, readable account sidesteps the mismatch. Safe here since the export is read-only.
 - The export authorizes the **Proxmox host's** IP, not the Jellyfin container's (`192.168.0.30`), because the host mounts the share and passes it into the container via a bind mount point — the container cannot mount NFS directly (a Linux kernel restriction, unrelated to this export's config) — see [services/proxmox.md](../services/proxmox.md#service-level-storage-media-app-data) and [services/jellyfin/README.md](../services/jellyfin/README.md#deployment-specs) for the full story.
+- **Rule for `192.168.0.31` — Squash: No mapping.** NFS passes the client's UID/GID through unchanged, so files written by the arr containers are owned by a real DSM account rather than `admin`. That account is the dedicated DSM user **`arr`** (UID `1030`, group `users` GID `100`): Read/Write on `tv` only, No access on every other share, all DSM applications denied — the same least-privilege pattern as `ha-backup`. The containers run as `PUID=1030` / `PGID=100`. Side effect of No mapping: `root` on the VM is also `root` on the share, which is why the export is restricted to that single IP.
+- **Permissions are decided by DSM ACLs, not Linux mode bits.** Over NFS, DSM reports every file and folder on this share as `777`, but access is actually granted by the shared-folder ACLs (the `arr` user's Read/Write privilege). A VM user with no matching DSM account — e.g. the VM's own login user (UID 1000) — gets `Permission denied` despite the `777` shown by `ls`. On the VM, use `sudo -u arr` (a local account mirroring UID 1030) to browse or change the share.
 
 ---
 

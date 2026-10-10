@@ -61,7 +61,7 @@ Within that `.1`–`.99` static range, a sub-range convention keeps assignments 
 | HP Elite Mini 600 G9 (Proxmox) | 192.168.0.2 | Proxmox host network config (see [hardware/compute.md](compute.md#network-configuration)) |
 | Synology DS420+ | 192.168.0.10 | DSM → Control Panel → Network (see [hardware/storage.md](storage.md#network-configuration)) |
 | Jellyfin LXC (CT 100) | 192.168.0.30 | Proxmox VE Advanced Settings during LXC creation (see [services/jellyfin/README.md](../services/jellyfin/README.md)) |
-| Arr Stack Docker VM (VM 101) *(planned — reserved, not yet deployed)* | 192.168.0.31 | Debian VM network config (see [services/arr-stack/README.md](../services/arr-stack/README.md)) |
+| Arr Stack Docker VM (VM 101, `arr-stack`) | 192.168.0.31 | Proxmox Cloud-Init tab, applied by cloud-init on first boot (see [services/arr-stack/README.md](../services/arr-stack/README.md#deployment-specs)) |
 | TeslaMate LXC (CT 102) | 192.168.0.32 | Proxmox VE Advanced Settings during LXC creation (see [services/teslamate/README.md](../services/teslamate/README.md)) |
 
 ---

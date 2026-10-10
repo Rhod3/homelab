@@ -1,0 +1,39 @@
+# yaml-language-server: $schema=https://schemas.recyclarr.dev/v8/config-schema.json
+# Radarr: [French MULTi.VO] UHD Bluray + WEB (default) and HD Bluray + WEB
+# (fallback for movies with no 2160p release). Merged from the Recyclarr
+# templates french-multi-vo-uhd-bluray-web and french-multi-vo-hd-bluray-web.
+
+radarr:
+  movies:
+    base_url: http://radarr:7878
+    api_key: !secret radarr_api_key
+
+    media_naming:
+      folder: jellyfin-tmdb
+      movie:
+        rename: true
+        standard: jellyfin-tmdb
+
+    quality_definition:
+      type: movie
+
+    quality_profiles:
+      - trash_id: 92ead7022d13a7858d54e328e6a2f8f9  # [French MULTi.VO] UHD Bluray + WEB
+        reset_unmatched_scores:
+          enabled: true
+      - trash_id: 2572ce3ea4eef1c19d59e0e20ed1cea7  # [French MULTi.VO] HD Bluray + WEB
+        reset_unmatched_scores:
+          enabled: true
+
+    custom_format_groups:
+      add:
+        - trash_id: ff204bbcecdd487d1cefcefdbf0c278d  # [Optional] Golden Rule UHD
+          assign_scores_to:
+            - trash_id: 92ead7022d13a7858d54e328e6a2f8f9  # UHD profile only
+        - trash_id: f8bf8eab4617f12dfdbd16303d8da245  # [Optional] Golden Rule HD
+          assign_scores_to:
+            - trash_id: 2572ce3ea4eef1c19d59e0e20ed1cea7  # HD profile only
+        - trash_id: 59f7ab9ff64d0026b011b985b1cc8670  # [Unwanted] Unwanted Formats French
+          assign_scores_to:
+            - trash_id: 92ead7022d13a7858d54e328e6a2f8f9
+            - trash_id: 2572ce3ea4eef1c19d59e0e20ed1cea7
