@@ -64,8 +64,10 @@ Since the volume is confirmed Btrfs, **data checksums are supported** and can be
 - `homeassistant_backups/`: Dedicated share reserved for automated Home Assistant backups.
 - `proxmox_backups/` (**Created**, in use): NFS target for scheduled `vzdump` backups of all VMs/LXCs except Home Assistant. See [services/proxmox.md](../services/proxmox.md#backup-jobs). Current footprint: CT 100 at ~1.8 GB per archive, up to 16 archives under the current retention (~29 GB worst case). Root squash on this export is why Proxmox needs `tmpdir: /var/tmp` to back up unprivileged LXCs.
 - `proxmox_images/` (**Created**): NFS target for Proxmox ISO images and LXC container templates, offloaded from local compute storage. See [services/proxmox.md](../services/proxmox.md#storage-configuration).
+- `paperless/` (**Planned**): Paperless-ngx document files (originals, OCR'd PDFs, thumbnails) in a `media/` subfolder, mounted read/write over NFS by the Paperless VM (`192.168.0.33`) only, through the dedicated DSM user `paperless` (No mapping). Data checksum on, recycle bin off, daily Btrfs snapshots. Owner's own account read-only over SMB for browsing. See [services/paperless-ngx/README.md](../services/paperless-ngx/README.md#storage-plan).
+- `paperless_backups/` (**Planned**): nightly `document_exporter` output in an `export/` subfolder, same NFS rule, DSM user and snapshot schedule as `paperless`.
 
-All four shares use `snake_case` naming — consistent across the board.
+All shares use `snake_case` naming — consistent across the board.
 
 ---
 
@@ -76,7 +78,7 @@ Access control follows a least-privilege pattern, scoped per share. The mechanis
 ### SMB/CIFS Shares (user-account based)
 
 - **`homeassistant_backups`**: A dedicated Synology user account named `ha-backup` is configured, restricted exclusively to read/write access on this share. No other share access is granted.
-- This is the template to reuse for any future app-level backup export (e.g. Paperless-ngx, Immich) that needs its own SMB/CIFS credential — see the backup approach table in [docs/storage-strategy.md](../docs/storage-strategy.md#upgrading-to-app-level-backups).
+- This is the template to reuse for any future app-level backup export (e.g. Immich) that needs its own SMB/CIFS credential. Paperless-ngx reuses the same least-privilege idea over NFS instead (dedicated `paperless` user, planned) — see the backup approach table in [docs/storage-strategy.md](../docs/storage-strategy.md#upgrading-to-app-level-backups).
 
 ### NFS Shares (host-restricted)
 

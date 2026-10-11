@@ -1,0 +1,138 @@
+# Paperless-ngx — runs on the Paperless Docker VM (VM 103, 192.168.0.33).
+# Plan, rationale and deployment steps: services/paperless-ngx/README.md
+#
+# Based on upstream's docker/compose/docker-compose.postgres-tika.yml, with:
+# pinned tags, local bind mounts instead of named Docker volumes, the document
+# files (media) and the nightly export on NFS mounts of the Synology, and
+# settings in this file + .env instead of upstream's docker-compose.env.
+#
+# Site-specific values (UID/GID, paths, secrets, image tags) come from .env —
+# copy .env.example to .env on the VM and fill it in. `${VAR:?}` makes
+# `docker compose` refuse to start if a required value is missing.
+#
+# No `container_name:` and no fixed network name on purpose: the restore test in
+# the README runs a second copy of this file under another project name
+# (`-p paperless-restore`), which fixed names would collide with. Use service
+# names instead, e.g. `docker compose exec webserver …`.
+
+name: paperless
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-common: &common
+  restart: unless-stopped
+  logging: *logging
+
+services:
+  ###############################################
+  # BROKER - Task queue (Valkey, Redis-compatible)
+  ###############################################
+  broker:
+    <<: *common
+    image: docker.io/valkey/valkey:${VALKEY_TAG:?}
+    volumes:
+      - ${APPDATA:?}/redis:/data
+
+  ###############################################
+  # DB - PostgreSQL (local disk only, never NFS)
+  ###############################################
+  # Only reachable on the Docker network. Postgres 18+ keeps its data in a
+  # versioned subfolder (/var/lib/postgresql/<major>/docker), which is why the
+  # parent folder is mounted. A major version change needs a dump/restore —
+  # see README "Updating image tags".
+  db:
+    <<: *common
+    image: docker.io/library/postgres:${POSTGRES_TAG:?}
+    environment:
+      POSTGRES_DB: paperless
+      POSTGRES_USER: paperless
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+    volumes:
+      - ${APPDATA:?}/pgdata:/var/lib/postgresql
+
+  ###############################################
+  # WEBSERVER - Paperless-ngx (UI, OCR, consumer, scheduler)
+  ###############################################
+  webserver:
+    <<: *common
+    image: ghcr.io/paperless-ngx/paperless-ngx:${PAPERLESS_TAG:?}
+    depends_on:
+      - db
+      - broker
+      - gotenberg
+      - tika
+    ports:
+      # From .env so the restore test can run on another port next to the live stack
+      - ${PAPERLESS_PORT:?}:8000
+    environment:
+      # Files on the NAS are owned by the `paperless` DSM user (NFS "No mapping")
+      USERMAP_UID: ${PAPERLESS_UID:?}
+      USERMAP_GID: ${PAPERLESS_GID:?}
+      PAPERLESS_URL: ${PAPERLESS_URL:?}
+      PAPERLESS_SECRET_KEY: ${PAPERLESS_SECRET_KEY:?}
+      PAPERLESS_TIME_ZONE: ${TZ:?}
+      PAPERLESS_REDIS: redis://broker:6379
+      PAPERLESS_DBENGINE: postgresql
+      PAPERLESS_DBHOST: db
+      PAPERLESS_DBPASS: ${POSTGRES_PASSWORD:?}
+      # fra, deu and eng ship with the image, so PAPERLESS_OCR_LANGUAGES
+      # (extra language packages) isn't needed.
+      PAPERLESS_OCR_LANGUAGE: fra+deu+eng
+      # Readable layout on the NAS, e.g. 2026/Swisscom/Facture octobre.pdf.
+      # REMOVE_NONE: a document without correspondent goes to 2026/<title>.pdf
+      # instead of 2026/none/<title>.pdf. Changing the format later needs
+      # `document_renamer` to move existing files.
+      PAPERLESS_FILENAME_FORMAT: "{{ created_year }}/{{ correspondent }}/{{ title }}"
+      PAPERLESS_FILENAME_FORMAT_REMOVE_NONE: "true"
+      # Office documents and .eml emails
+      PAPERLESS_TIKA_ENABLED: 1
+      PAPERLESS_TIKA_GOTENBERG_ENDPOINT: http://gotenberg:3000
+      PAPERLESS_TIKA_ENDPOINT: http://tika:9998
+    volumes:
+      # Local VM disk: search index, auto-matching model, logs
+      - ${APPDATA:?}/data:/usr/src/paperless/data
+      # Unused for now (uploads come from the phone app and web UI), but
+      # Paperless expects the folder. Local, so no NFS polling is needed.
+      - ${APPDATA:?}/consume:/usr/src/paperless/consume
+      # NFS (Synology `paperless` share): originals, archived PDFs, thumbnails.
+      # create_host_path: false — if the NFS mount is missing, the container
+      # refuses to start instead of silently writing documents to the VM disk.
+      - type: bind
+        source: ${MEDIA:?}
+        target: /usr/src/paperless/media
+        bind:
+          create_host_path: false
+      # NFS (Synology `paperless_backups` share): nightly document_exporter target
+      - type: bind
+        source: ${EXPORT:?}
+        target: /usr/src/paperless/export
+        bind:
+          create_host_path: false
+
+  ###############################################
+  # GOTENBERG - Converts Office documents and .eml to PDF
+  ###############################################
+  # Flags from upstream: the Chromium route renders .eml files, and external
+  # content (tracking pixels, JavaScript) must not be loaded.
+  gotenberg:
+    <<: *common
+    image: docker.io/gotenberg/gotenberg:${GOTENBERG_TAG:?}
+    command:
+      - "gotenberg"
+      - "--chromium-disable-javascript=true"
+      - "--chromium-allow-list=file:///tmp/.*"
+
+  ###############################################
+  # TIKA - Extracts text and metadata from Office documents and emails
+  ###############################################
+  tika:
+    <<: *common
+    image: docker.io/apache/tika:${TIKA_TAG:?}
+
+# No fixed network name on purpose: the default `<project>_default` network
+# keeps the restore-test copy (`-p paperless-restore`) isolated, so its
+# `db`/`broker` names can never resolve to the live containers.

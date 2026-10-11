@@ -85,7 +85,7 @@ flowchart TD
 
 | Service | Native Backup Support | Recommended Approach |
 | --- | --- | --- |
-| **Paperless-ngx** | `document_exporter` / `document_importer` (full portable export) | App-level export, same pattern as Home Assistant |
+| **Paperless-ngx** | `document_exporter` / `document_importer` (full portable export) | Documents stored directly on the NAS (`paperless` share) + nightly `document_exporter` to `paperless_backups` + Btrfs snapshots + `vzdump` (planned) — see [services/paperless-ngx/README.md](../services/paperless-ngx/README.md#backup-requirements) |
 | **Immich** | `pg_dump` / `pg_dumpall` for metadata only | DB dump plus filesystem sync of the library folder |
 | **Jellyfin** | No native export; media already lives on the NAS | Periodic copy of the config/DB directory only |
 | **Arr Stack** (Radarr, Sonarr, Prowlarr, …) | Built-in scheduled backup per app (portable `.zip` of config + DB) | `vzdump` of the Docker VM plus each app's built-in backup — see [services/arr-stack/README.md](../services/arr-stack/README.md#backup-requirements) |

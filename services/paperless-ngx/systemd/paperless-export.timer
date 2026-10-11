@@ -1,0 +1,18 @@
+# Runs paperless-export.service every night at 03:30: after Paperless' own
+# nightly tasks, before the Synology snapshot (04:00) and the 05:00 vzdump
+# job that shuts the VM down.
+# Install: /etc/systemd/system/paperless-export.timer, then
+#   systemctl daemon-reload && systemctl enable --now paperless-export.timer
+#
+# No Persistent=true on purpose: a run missed while the VM was off would fire
+# right at boot, before the Paperless container is up, and fail. A missed
+# night is simply caught up by the next one.
+
+[Unit]
+Description=Nightly Paperless-ngx document export
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+
+[Install]
+WantedBy=timers.target

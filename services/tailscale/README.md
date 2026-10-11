@@ -1,10 +1,10 @@
 # Tailscale (Remote Access)
 
-[Tailscale](https://tailscale.com/) is a WireGuard-based overlay network. Each device that has the Tailscale app joins a private network (the *tailnet*) and can reach the others directly, even through NAT, without opening any port on the router. One node, the **subnet router**, advertises the home LAN (`192.168.0.0/24`) to the tailnet, so a phone or laptop outside the house can reach every existing service at its usual LAN address: the arr stack, Jellyfin, Proxmox, Home Assistant, TeslaMate, the NAS.
+[Tailscale](https://tailscale.com/) is a WireGuard-based overlay network. Each device that has the Tailscale app joins a private network (the *tailnet*) and can reach the others directly, even through NAT, without opening any port on the router. One node, the **subnet router**, advertises the home LAN (`192.168.0.0/24`) to the tailnet, so a phone or laptop outside the house can reach every existing service at its usual LAN address: the arr stack, Jellyfin, Proxmox, Home Assistant, TeslaMate, Paperless-ngx, the NAS.
 
 This implements **Decision 5, Proposition A** in [docs/network-strategy.md](../../docs/network-strategy.md#decision-5-remote-access) (VPN-only remote access, no public exposure).
 
-**Status**: Planned (2026-10-10). Nothing deployed yet. CT ID, IP and hostname below are **proposed** and follow the existing conventions; confirm them before step 2.
+**Status**: Planned (2026-10-10). Nothing deployed yet. CT ID and IP are **TBD**: the originally proposed CT 103 / `192.168.0.33` were given to Paperless-ngx on 2026-10-11 (see [services/paperless-ngx/README.md](../paperless-ngx/README.md)). Pick the next free ID and address in the `.30`–`.99` range before step 2; `<CTID>` and `<TS_IP>` below stand for them. The hostname is still a proposal.
 
 ---
 
@@ -21,22 +21,23 @@ flowchart LR
 
     subgraph Home[Home LAN 192.168.0.0/24]
         ISP[ISP router<br/>192.168.1.1] --> TPL[TP-Link<br/>192.168.0.1]
-        TPL --> CT103[Tailscale LXC - CT 103<br/>192.168.0.33<br/>subnet router + SNAT]
-        CT103 --> ARR[Arr stack VM 101<br/>192.168.0.31]
-        CT103 --> JF[Jellyfin CT 100<br/>192.168.0.30]
-        CT103 --> TM[TeslaMate CT 102<br/>192.168.0.32]
-        CT103 --> PVE[Proxmox UI<br/>192.168.0.2:8006]
-        CT103 --> NAS[Synology<br/>192.168.0.10]
+        TPL --> TSR[Tailscale LXC - CT TBD<br/>IP TBD<br/>subnet router + SNAT]
+        TSR --> ARR[Arr stack VM 101<br/>192.168.0.31]
+        TSR --> JF[Jellyfin CT 100<br/>192.168.0.30]
+        TSR --> TM[TeslaMate CT 102<br/>192.168.0.32]
+        TSR --> PL[Paperless VM 103<br/>192.168.0.33]
+        TSR --> PVE[Proxmox UI<br/>192.168.0.2:8006]
+        TSR --> NAS[Synology<br/>192.168.0.10]
     end
 
     Phone -. control plane .-> Coord
-    CT103 -. control plane, outbound only .-> Coord
-    Phone <==>|WireGuard, direct via NAT traversal| CT103
-    Phone -. if direct fails .-> DERP -.-> CT103
+    TSR -. control plane, outbound only .-> Coord
+    Phone <==>|WireGuard, direct via NAT traversal| TSR
+    Phone -. if direct fails .-> DERP -.-> TSR
 ```
 
 - **No inbound port forwards** on either router. `tailscaled` only makes outbound connections; NAT traversal punches through the double NAT (ISP router → TP-Link) in most cases, and Tailscale's DERP relays carry the traffic when it can't.
-- **SNAT on** (Tailscale's default on Linux): traffic from remote devices reaches LAN hosts with the subnet router's LAN address (`192.168.0.33`) as source. LAN hosts therefore need no return route, and the TP-Link needs no change. It also keeps qBittorrent reachable: its kill switch only answers `VPN_LAN_NETWORK` (`192.168.0.0/24`), see [docker-compose.yml](../arr-stack/docker-compose.yml) — a `100.x.y.z` Tailscale address would be dropped.
+- **SNAT on** (Tailscale's default on Linux): traffic from remote devices reaches LAN hosts with the subnet router's LAN address (`<TS_IP>`, TBD) as source. LAN hosts therefore need no return route, and the TP-Link needs no change. It also keeps qBittorrent reachable: its kill switch only answers `VPN_LAN_NETWORK` (`192.168.0.0/24`), see [docker-compose.yml](../arr-stack/docker-compose.yml) — a `100.x.y.z` Tailscale address would be dropped.
 - **Nothing changes on the existing services.** They stay LAN-only and keep their own logins; Tailscale only adds a way for authorised devices to *be* on the LAN.
 
 ---
@@ -45,12 +46,12 @@ flowchart LR
 
 - **Host Platform**: Proxmox VE on HP Elite Mini 600 G9.
 - **Deployment Type**: Unprivileged LXC with `/dev/net/tun` passed through (the only extra permission Tailscale needs, per [Tailscale's LXC guide](https://tailscale.com/kb/1130/lxc-unprivileged)).
-- **Container ID**: 103 *(proposed — next free ID after CT 102)*.
+- **Container ID**: TBD *(103 was given to Paperless-ngx; use the next free ID)*.
 - **Hostname**: `tailscale` *(proposed)*. Also the machine name shown in the Tailscale admin console.
 - **Base image**: Debian 13 standard LXC template, stored on `nas-images`.
 - **Sizing**: 1 vCPU, 512 MB RAM, 512 MB swap, 4 GB disk on `vm-disks`. `tailscaled` uses well under 100 MB RAM; the ISP upload speed will limit throughput long before one core does. Cores and RAM can be raised live if needed.
 - **Provisioning Method**: plain Debian LXC from the Proxmox GUI, Tailscale installed from Tailscale's official apt repository (see [Decision Log](#decision-log) #2).
-- **Network**: static IP `192.168.0.33/24` *(proposed — next address in the `.30`–`.99` service range, see [hardware/networking.md](../../hardware/networking.md#static-ip-assignments))*, gateway `192.168.0.1`.
+- **Network**: static IP TBD *(`.33` was given to Paperless-ngx; use the next free address in the `.30`–`.99` service range, see [hardware/networking.md](../../hardware/networking.md#static-ip-assignments))*, gateway `192.168.0.1`.
 - **Start at boot**: **yes**. After a power cut, remote access must come back on its own.
 - **Advertised route**: `192.168.0.0/24` (the whole LAN). Who may use which part of it is controlled by the tailnet policy, see [Access Policy](#access-policy).
 - **Updates**: Tailscale's built-in auto-update (`tailscale set --auto-update`) for Tailscale itself; Debian `unattended-upgrades` for the OS.
@@ -81,7 +82,7 @@ Before anyone else (family) is added, replace the default with a policy that lim
 
 ## Backup Requirements
 
-- Add CT 103 to the existing 05:00 `vzdump` job (stop mode) in [services/proxmox.md](../proxmox.md#backup-jobs). Remote access drops for ~30 s each night at 05:00 — acceptable.
+- Add the container to the existing 05:00 `vzdump` job (stop mode) in [services/proxmox.md](../proxmox.md#backup-jobs). Remote access drops for ~30 s each night at 05:00 — acceptable.
 - **Not critical data**: if the backup is lost, a fresh container + `tailscale up` recreates the node in a few minutes. The backup mainly saves re-approving the route and re-disabling key expiry.
 - **Test restores must not have a network**: a restored copy holds the same node key as the live container. Booted with `net0`, it would join the tailnet as the same machine and fight the original for the connection. Same procedure as CT 100/102: restore as a temporary ID, remove `net0`, check `/var/lib/tailscale/` exists, destroy.
 
@@ -90,7 +91,7 @@ Before anyone else (family) is added, replace the default with a policy that lim
 ## Dependencies
 
 - **Tailscale account** and its identity provider login (Google, Apple, Microsoft, GitHub, …). The coordination server must be reachable for new connections and key changes; already-established connections keep working for a while if it's briefly down.
-- **Proxmox host and CT 103 up**. If either is down, remote access is gone, including access to fix it remotely — see [Known Limitations](#known-limitations).
+- **Proxmox host and the Tailscale container up**. If either is down, remote access is gone, including access to fix it remotely — see [Known Limitations](#known-limitations).
 - **Tailscale app** on every remote device.
 
 ---
@@ -133,13 +134,13 @@ Commands run on the **Proxmox host** shell unless stated otherwise. No step chan
    pveam download nas-images <template-name-from-the-list>
    ```
    `pveam update` refreshes Proxmox's list of downloadable templates, `pveam available` shows the Debian 13 ones, and `pveam download` stores the chosen one on `nas-images` with the other templates.
-2. ⬜ **Create the container** (GUI → **Create CT**): CT ID `103`, hostname `tailscale`, **Unprivileged** checked, SSH public key, root password into the password manager; template from step 1; disk `4` GB on `vm-disks`; 1 core; 512 MB RAM, 512 MB swap; `net0` on `vmbr0`, static `192.168.0.33/24`, gateway `192.168.0.1`; DNS: use host settings. **Don't** tick *Start after created*. Then **Options → Start at boot: Yes**.
+2. ⬜ **Create the container** (GUI → **Create CT**): CT ID `<CTID>`, hostname `tailscale`, **Unprivileged** checked, SSH public key, root password into the password manager; template from step 1; disk `4` GB on `vm-disks`; 1 core; 512 MB RAM, 512 MB swap; `net0` on `vmbr0`, static `<TS_IP>/24`, gateway `192.168.0.1`; DNS: use host settings. **Don't** tick *Start after created*. Then **Options → Start at boot: Yes**.
 3. ⬜ **Pass through the TUN device**:
    ```bash
-   pct set 103 --dev0 /dev/net/tun
+   pct set <CTID> --dev0 /dev/net/tun
    ```
-   Tailscale creates a virtual network interface (`tailscale0`) through `/dev/net/tun`. An unprivileged container can't access that device by default; this line gives CT 103, and only CT 103, access to it. Same as GUI → CT 103 → Resources → Add → Device Passthrough. It's Proxmox's native equivalent of the two raw `lxc.*` lines in Tailscale's guide.
-4. ⬜ **Base system** (start the container with `pct start 103`, then `pct enter 103` opens a root shell inside it):
+   Tailscale creates a virtual network interface (`tailscale0`) through `/dev/net/tun`. An unprivileged container can't access that device by default; this line gives this container, and only this container, access to it. Same as GUI → the container → Resources → Add → Device Passthrough. It's Proxmox's native equivalent of the two raw `lxc.*` lines in Tailscale's guide.
+4. ⬜ **Base system** (start the container with `pct start <CTID>`, then `pct enter <CTID>` opens a root shell inside it):
    ```bash
    apt update && apt full-upgrade -y
    apt install -y curl unattended-upgrades
@@ -172,15 +173,15 @@ Commands run on the **Proxmox host** shell unless stated otherwise. No step chan
 9. ⬜ **Verify from outside**, on the phone with **Wi-Fi off** (mobile data) and Tailscale on:
    - Seerr `http://192.168.0.31:5055`, Radarr `:7878`, Jellyfin `http://192.168.0.30:8096`, Proxmox `https://192.168.0.2:8006` load.
    - qBittorrent `http://192.168.0.31:8080` loads: confirms SNAT works with its kill switch.
-   - Inside CT 103: `tailscale status` lists the phone; `tailscale ping <phone-name>` shows `via <ip>:<port>` for a direct connection or `via DERP(...)` for a relayed one. `tailscale netcheck` reports the NAT type. Record which one appears (see [Known Limitations](#known-limitations) — double NAT).
+   - Inside the container: `tailscale status` lists the phone; `tailscale ping <phone-name>` shows `via <ip>:<port>` for a direct connection or `via DERP(...)` for a relayed one. `tailscale netcheck` reports the NAT type. Record which one appears (see [Known Limitations](#known-limitations) — double NAT).
    - Play a few minutes of a film in Jellyfin remotely and check it doesn't stall.
-   - **Back home on Wi-Fi with Tailscale still on**: Jellyfin still plays, and `tailscale status` on CT 103 shows no traffic from the phone — confirms local traffic isn't hairpinning through the tunnel.
-10. ⬜ **Backups**: add CT 103 to the 05:00 job (Datacenter → Backup → Edit). After the first run, test-restore as a temporary ID **with `net0` removed** (see [Backup Requirements](#backup-requirements)), check `/var/lib/tailscale/tailscaled.state` exists, then destroy it.
-11. ⬜ **Docs**: mark Deployed in [services/README.md](../README.md); add CT 103 to [hardware/networking.md](../../hardware/networking.md#static-ip-assignments), to *Hosted Workloads* and the backup job table in [services/proxmox.md](../proxmox.md); record the results of steps 9 and 10 here.
+   - **Back home on Wi-Fi with Tailscale still on**: Jellyfin still plays, and `tailscale status` in the container shows no traffic from the phone — confirms local traffic isn't hairpinning through the tunnel.
+10. ⬜ **Backups**: add the container to the 05:00 job (Datacenter → Backup → Edit). After the first run, test-restore as a temporary ID **with `net0` removed** (see [Backup Requirements](#backup-requirements)), check `/var/lib/tailscale/tailscaled.state` exists, then destroy it.
+11. ⬜ **Docs**: mark Deployed in [services/README.md](../README.md); add the container to [hardware/networking.md](../../hardware/networking.md#static-ip-assignments), to *Hosted Workloads* and the backup job table in [services/proxmox.md](../proxmox.md); record the results of steps 9 and 10 here.
 
 ### Rollback
 
-Nothing outside CT 103 and the Tailscale account changes, so undoing it is: `tailscale logout` inside the container (or remove the machine in the admin console), then destroy CT 103. Remote devices simply lose access; the LAN is unaffected.
+Nothing outside the container and the Tailscale account changes, so undoing it is: `tailscale logout` inside the container (or remove the machine in the admin console), then destroy the container. Remote devices simply lose access; the LAN is unaffected.
 
 ---
 

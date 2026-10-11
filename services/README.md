@@ -14,9 +14,9 @@ This directory tracks all deployed and planned services within the homelab envir
 | **AdGuard Home** | Proxmox VE | Planned | [services/adguard-home/README.md](adguard-home/README.md) |
 | **Arr Stack** (Prowlarr, Radarr, Sonarr, qBittorrent, Bazarr, Seerr, …) | Proxmox VE (Docker VM, VM 101) | Deployed | [services/arr-stack/README.md](arr-stack/README.md) |
 | **TeslaMate** | Proxmox VE (LXC, CT 102) | Deployed | [services/teslamate/README.md](teslamate/README.md) |
-| **Tailscale** (remote access, subnet router) | Proxmox VE (LXC, CT 103 proposed) | Planned | [services/tailscale/README.md](tailscale/README.md) |
+| **Tailscale** (remote access, subnet router) | Proxmox VE (LXC, CT ID TBD) | Planned | [services/tailscale/README.md](tailscale/README.md) |
 | **Immich** | Proxmox VE | Planned | TBD |
-| **Paperless-ngx** | Proxmox VE | Planned | TBD |
+| **Paperless-ngx** | Proxmox VE (Docker VM, VM 103) | Planned | [services/paperless-ngx/README.md](paperless-ngx/README.md) |
 
 ---
 

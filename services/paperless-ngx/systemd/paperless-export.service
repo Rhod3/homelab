@@ -1,0 +1,19 @@
+# Nightly Paperless-ngx export to the Synology `paperless_backups` share.
+# Install: /etc/systemd/system/paperless-export.service (with the .timer).
+# See services/paperless-ngx/README.md "Backup Requirements".
+#
+# `../export` is /usr/src/paperless/export inside the container, i.e. the
+# EXPORT folder from .env. The export is incremental: only new or changed
+# documents are rewritten. --delete removes files of documents that no longer
+# exist in Paperless; older states stay available in the share's Btrfs snapshots.
+
+[Unit]
+Description=Paperless-ngx nightly document export to the NAS
+Requires=docker.service
+After=docker.service
+RequiresMountsFor=/mnt/paperless_backups
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/paperless
+ExecStart=/usr/bin/docker compose exec -T webserver document_exporter ../export --delete --no-progress-bar
