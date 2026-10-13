@@ -270,6 +270,6 @@ The script's `update` command doesn't take a backup and rebuilds from source. Fo
 
 - **MQTT decision** once Home Assistant runs on Proxmox.
 - **Name-based access** via AdGuard Home; then extend `CHECK_ORIGIN` and the URLs in TeslaMate **Settings → URLs**.
-- **Remote access** (e.g. checking a charge from outside): only through the remote access approach chosen in [docs/network-strategy.md](../../docs/network-strategy.md), never by port-forwarding 4000/3000.
+- **Remote access** (e.g. checking a charge from outside): only through Tailscale ([services/tailscale/README.md](../tailscale/README.md), deployed 2026-10-13), never by port-forwarding 4000/3000. Note that TeslaMate has no login of its own, so anyone on the tailnet can reach it.
 - **Hide the second car completely** (only if the extra dropdown entry becomes a nuisance): sign TeslaMate in with a separate Tesla account that only has driver access to the car with VIN ending `433499`, then delete the other car with upstream's SQL. Test first that a driver-access account works with TeslaMate. Optionally, the few hours of data logged for the second car can be deleted with SQL while keeping its `cars` row (after a fresh backup).
 - **Move to Docker (Option B)** if the source-build path becomes fragile: restore the nightly `teslamate.bck` with upstream's restore procedure and reuse the same `ENCRYPTION_KEY`.

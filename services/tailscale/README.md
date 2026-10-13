@@ -4,7 +4,7 @@
 
 This implements **Decision 5, Proposition A** in [docs/network-strategy.md](../../docs/network-strategy.md#decision-5-remote-access) (VPN-only remote access, no public exposure).
 
-**Status**: Planned (2026-10-10). Nothing deployed yet. CT ID and IP are **TBD**: the originally proposed CT 103 / `192.168.0.33` were given to Paperless-ngx on 2026-10-11 (see [services/paperless-ngx/README.md](../paperless-ngx/README.md)). Pick the next free ID and address in the `.30`–`.99` range before step 2; `<CTID>` and `<TS_IP>` below stand for them. The hostname is still a proposal.
+**Status**: Deployed and verified on 2026-10-13 (planned 2026-10-10). CT **104** `tailscale`, `192.168.0.34`, advertising `192.168.0.0/24`. Remote access tested from the iPhone on mobile data (direct connection, no relay), in the nightly backup job, and a test restore passed — see [Deployment Steps](#deployment-steps). The originally proposed CT 103 / `192.168.0.33` went to Paperless-ngx on 2026-10-11, see [services/paperless-ngx/README.md](../paperless-ngx/README.md).
 
 ---
 
@@ -20,8 +20,8 @@ flowchart LR
     DERP[Tailscale DERP relays<br/>fallback if no direct path]
 
     subgraph Home[Home LAN 192.168.0.0/24]
-        ISP[ISP router<br/>192.168.1.1] --> TPL[TP-Link<br/>192.168.0.1]
-        TPL --> TSR[Tailscale LXC - CT TBD<br/>IP TBD<br/>subnet router + SNAT]
+        ISP[ISP router<br/>FRITZ!Box - Init7] --> TPL[TP-Link<br/>192.168.0.1]
+        TPL --> TSR[Tailscale LXC - CT 104<br/>192.168.0.34<br/>subnet router + SNAT]
         TSR --> ARR[Arr stack VM 101<br/>192.168.0.31]
         TSR --> JF[Jellyfin CT 100<br/>192.168.0.30]
         TSR --> TM[TeslaMate CT 102<br/>192.168.0.32]
@@ -36,8 +36,8 @@ flowchart LR
     Phone -. if direct fails .-> DERP -.-> TSR
 ```
 
-- **No inbound port forwards** on either router. `tailscaled` only makes outbound connections; NAT traversal punches through the double NAT (ISP router → TP-Link) in most cases, and Tailscale's DERP relays carry the traffic when it can't.
-- **SNAT on** (Tailscale's default on Linux): traffic from remote devices reaches LAN hosts with the subnet router's LAN address (`<TS_IP>`, TBD) as source. LAN hosts therefore need no return route, and the TP-Link needs no change. It also keeps qBittorrent reachable: its kill switch only answers `VPN_LAN_NETWORK` (`192.168.0.0/24`), see [docker-compose.yml](../arr-stack/docker-compose.yml) — a `100.x.y.z` Tailscale address would be dropped.
+- **No manual port forwards** on either router. `tailscaled` only makes outbound connections; NAT traversal punches through the double NAT (ISP router → TP-Link) in most cases, and Tailscale's DERP relays carry the traffic when it can't. One exception found in step 9: the TP-Link has **UPnP / NAT-PMP** enabled, and `tailscaled` uses it to open a temporary UDP forward on the TP-Link to itself. That forward is on the inner router only (the FRITZ!Box still blocks unsolicited inbound traffic) and only accepts authenticated WireGuard packets. Kept for now, see [Decision Log](#decision-log) #8.
+- **SNAT on** (Tailscale's default on Linux): traffic from remote devices reaches LAN hosts with the subnet router's LAN address (`192.168.0.34`) as source. LAN hosts therefore need no return route, and the TP-Link needs no change. It also keeps qBittorrent reachable: its kill switch only answers `VPN_LAN_NETWORK` (`192.168.0.0/24`), see [docker-compose.yml](../arr-stack/docker-compose.yml) — a `100.x.y.z` Tailscale address would be dropped.
 - **Nothing changes on the existing services.** They stay LAN-only and keep their own logins; Tailscale only adds a way for authorised devices to *be* on the LAN.
 
 ---
@@ -46,12 +46,12 @@ flowchart LR
 
 - **Host Platform**: Proxmox VE on HP Elite Mini 600 G9.
 - **Deployment Type**: Unprivileged LXC with `/dev/net/tun` passed through (the only extra permission Tailscale needs, per [Tailscale's LXC guide](https://tailscale.com/kb/1130/lxc-unprivileged)).
-- **Container ID**: TBD *(103 was given to Paperless-ngx; use the next free ID)*.
-- **Hostname**: `tailscale` *(proposed)*. Also the machine name shown in the Tailscale admin console.
+- **Container ID**: 104.
+- **Hostname**: `tailscale`. Also the machine name shown in the Tailscale admin console.
 - **Base image**: Debian 13 standard LXC template, stored on `nas-images`.
 - **Sizing**: 1 vCPU, 512 MB RAM, 512 MB swap, 4 GB disk on `vm-disks`. `tailscaled` uses well under 100 MB RAM; the ISP upload speed will limit throughput long before one core does. Cores and RAM can be raised live if needed.
 - **Provisioning Method**: plain Debian LXC from the Proxmox GUI, Tailscale installed from Tailscale's official apt repository (see [Decision Log](#decision-log) #2).
-- **Network**: static IP TBD *(`.33` was given to Paperless-ngx; use the next free address in the `.30`–`.99` service range, see [hardware/networking.md](../../hardware/networking.md#static-ip-assignments))*, gateway `192.168.0.1`.
+- **Network**: static IP `192.168.0.34/24` (next free address in the `.30`–`.99` service range, see [hardware/networking.md](../../hardware/networking.md#static-ip-assignments)), gateway `192.168.0.1`.
 - **Start at boot**: **yes**. After a power cut, remote access must come back on its own.
 - **Advertised route**: `192.168.0.0/24` (the whole LAN). Who may use which part of it is controlled by the tailnet policy, see [Access Policy](#access-policy).
 - **Updates**: Tailscale's built-in auto-update (`tailscale set --auto-update`) for Tailscale itself; Debian `unattended-upgrades` for the OS.
@@ -82,7 +82,7 @@ Before anyone else (family) is added, replace the default with a policy that lim
 
 ## Backup Requirements
 
-- Add the container to the existing 05:00 `vzdump` job (stop mode) in [services/proxmox.md](../proxmox.md#backup-jobs). Remote access drops for ~30 s each night at 05:00 — acceptable.
+- Included in the existing 05:00 `vzdump` job (stop mode) in [services/proxmox.md](../proxmox.md#backup-jobs) since 2026-10-13. Remote access drops for ~30 s each night at 05:00 — acceptable.
 - **Not critical data**: if the backup is lost, a fresh container + `tailscale up` recreates the node in a few minutes. The backup mainly saves re-approving the route and re-disabling key expiry.
 - **Test restores must not have a network**: a restored copy holds the same node key as the live container. Booted with `net0`, it would join the tailnet as the same machine and fight the original for the connection. Same procedure as CT 100/102: restore as a temporary ID, remove `net0`, check `/var/lib/tailscale/` exists, destroy.
 
@@ -90,7 +90,7 @@ Before anyone else (family) is added, replace the default with a policy that lim
 
 ## Dependencies
 
-- **Tailscale account** and its identity provider login (Google, Apple, Microsoft, GitHub, …). The coordination server must be reachable for new connections and key changes; already-established connections keep working for a while if it's briefly down.
+- **Tailscale account**, signed in with **GitHub** as the identity provider. The coordination server must be reachable for new connections and key changes; already-established connections keep working for a while if it's briefly down.
 - **Proxmox host and the Tailscale container up**. If either is down, remote access is gone, including access to fix it remotely — see [Known Limitations](#known-limitations).
 - **Tailscale app** on every remote device.
 
@@ -101,9 +101,9 @@ Before anyone else (family) is added, replace the default with a policy that lim
 - **The identity provider account is now a key to the LAN.** Whoever can log in to it can add a device to the tailnet. Use an account with strong 2FA (passkey or authenticator app), not SMS.
 - **Device approval on** (admin console → Settings → Device management): a newly logged-in device can't reach anything until it's approved by hand. Protects against a stolen IdP session silently adding a device.
 - **Key expiry disabled only on the subnet router.** Personal devices keep the default expiry and re-authenticate periodically; an unattended server can't, so its expiry is turned off.
-- **No public exposure**: no port forwards, no public DNS records. Scanners on the internet see nothing new.
+- **No public exposure**: no manual port forwards, no public DNS records. Scanners on the internet see nothing new. The UPnP/NAT-PMP mapping `tailscaled` opens on the TP-Link (see [Architecture Plan](#architecture-plan)) isn't reachable from the internet through the FRITZ!Box.
 - **App logins stay on.** The arr apps, qBittorrent, Proxmox and the NAS keep their own authentication, so a compromised Tailscale device still faces a login on each service.
-- **Least privilege in the container**: unprivileged LXC, only `/dev/net/tun` added; no NAS mounts; SSH by key only; Tailscale SSH not used.
+- **Least privilege in the container**: unprivileged LXC, only `/dev/net/tun` added; no NAS mounts; SSH by key only; Tailscale SSH not used. Features: `nesting=1` (Proxmox default, for systemd) but **not** `keyctl=1`: Tailscale's CLI instructions set both, but `keyctl` (kernel keyring access) is only needed for Docker/runc in unprivileged containers, and Tailscale's own GUI method adds no feature flags.
 - **What Tailscale (the company) sees**: device names, Tailscale IPs, public IPs and connection metadata. Traffic is end-to-end encrypted by WireGuard; relayed traffic through DERP is still encrypted. `tailscaled` also sends diagnostic logs to Tailscale by default — these can be turned off with `--no-logs-no-support`, at the cost of Tailscale support not being able to help.
 - **Optional hardening, not planned now**: [Tailnet Lock](https://tailscale.com/kb/1226/tailnet-lock) — new devices must be signed by a trusted device, so even a compromised coordination server can't add one. Adds a signing step for every new device.
 
@@ -114,7 +114,8 @@ Before anyone else (family) is added, replace the default with a policy that lim
 - **Remote networks that also use `192.168.0.0/24`.** This is a very common default (TP-Link and many others). On such a network — a friend's house, some hotels — the remote device's own LAN route is as specific as the advertised one, and on macOS/Windows the local route wins ([Tailscale docs](https://tailscale.com/docs/reference/troubleshooting/network-configuration/lan-traffic-overlapping-subnets)), so the home services are unreachable. Workarounds today: switch the phone to mobile data or use its hotspot. Lasting fix: renumber the home LAN to an uncommon range when VLANs are introduced (Phase 2 in [docs/network-strategy.md](../../docs/network-strategy.md#suggested-phased-rollout)). [4via6 routing](https://tailscale.com/kb/1201/4via6-subnets) is another option, but it replaces familiar IPv4 addresses with long IPv6 ones.
 - **At home with Tailscale on**: same overlap, other direction. On macOS/Windows the local route wins and traffic stays on the LAN, which is what we want. Behaviour on iOS/Android is not documented by Tailscale — check in [step 9](#deployment-steps) that Jellyfin at home still streams directly. If not, turn Tailscale off at home (or use the app's on-demand rules).
 - **Single point of failure on Proxmox.** If the HP is down, there's no remote access to diagnose it. A possible later mitigation: a second subnet router advertising the same route from the Synology Tailscale package, for automatic [failover](https://tailscale.com/kb/1115/high-availability). Not planned now (keeps the Synology storage-only).
-- **Double NAT may force relayed connections.** If NAT traversal fails, traffic goes through DERP: it works, but with more latency and lower speed (noticeable for remote Jellyfin). Checked in step 9. If it's a problem, forwarding UDP 41641 on both routers would allow direct connections — that's a router change and needs a separate decision.
+- **Double NAT may force relayed connections.** If NAT traversal fails, traffic goes through DERP: it works, but with more latency and lower speed (noticeable for remote Jellyfin). Checked in step 9. If it's a problem, forwarding UDP 41641 on both routers would allow direct connections — that's a router change and needs a separate decision. **Step 9 result: direct**, not relayed (`MappingVariesByDestIP: false`).
+- **Services see remote clients as local.** Because of SNAT, every remote request arrives from `192.168.0.34`, a LAN address. Apps that treat LAN and internet clients differently can't tell them apart. Jellyfin in particular applies no internet streaming bitrate limit, so on mobile data the quality has to be lowered in the player. Seen in step 9.
 - **Names**: until AdGuard Home exists, services are reached by IP. Afterwards, Tailscale [split DNS](https://tailscale.com/kb/1054/dns) can send `home.yourdomain.tld` queries to AdGuard over the subnet route, so the same names work remotely.
 
 ---
@@ -123,61 +124,63 @@ Before anyone else (family) is added, replace the default with a policy that lim
 
 Commands run on the **Proxmox host** shell unless stated otherwise. No step changes the router, DHCP or DNS.
 
-0. ⬜ **Prepare the account**:
-   - Create the Tailscale account (free Personal plan) at [login.tailscale.com](https://login.tailscale.com), signing in with the identity provider chosen above. Check 2FA is on for that IdP account.
+0. ✅ **Prepare the account**:
+   - Create the Tailscale account (free Personal plan) at [login.tailscale.com](https://login.tailscale.com), signing in with **GitHub** (chosen 2026-10-13). Check that GitHub 2FA uses a passkey or authenticator app, not SMS.
    - Admin console → Settings → Device management: enable **device approval** (new devices must be approved manually).
    - Install the Tailscale app on the phone and log in (approve it in the console). This is the test client for step 9.
-1. ⬜ **Template**: in the GUI, `nas-images` → **CT Templates** → **Templates**, pick the latest `debian-13-standard`, **Download**. CLI equivalent:
+1. ✅ **Template** (`debian-13-standard_13.6-1_amd64.tar.zst`, 2026-10-13): in the GUI, `nas-images` → **CT Templates** → **Templates**, pick the latest `debian-13-standard`, **Download**. CLI equivalent:
    ```bash
    pveam update
    pveam available --section system | grep debian-13
    pveam download nas-images <template-name-from-the-list>
    ```
    `pveam update` refreshes Proxmox's list of downloadable templates, `pveam available` shows the Debian 13 ones, and `pveam download` stores the chosen one on `nas-images` with the other templates.
-2. ⬜ **Create the container** (GUI → **Create CT**): CT ID `<CTID>`, hostname `tailscale`, **Unprivileged** checked, SSH public key, root password into the password manager; template from step 1; disk `4` GB on `vm-disks`; 1 core; 512 MB RAM, 512 MB swap; `net0` on `vmbr0`, static `<TS_IP>/24`, gateway `192.168.0.1`; DNS: use host settings. **Don't** tick *Start after created*. Then **Options → Start at boot: Yes**.
-3. ⬜ **Pass through the TUN device**:
+2. ✅ **Create the container** (GUI → **Create CT**): CT ID `104`, hostname `tailscale`, **Unprivileged** checked, **Nesting** left checked (the default for unprivileged CTs; Debian 13's systemd uses nested namespaces to sandbox services), SSH public key, root password into the password manager; template from step 1; disk `4` GB on `vm-disks`; 1 core; 512 MB RAM, 512 MB swap; `net0` on `vmbr0`, static `192.168.0.34/24`, gateway `192.168.0.1`; DNS: use host settings. **Don't** tick *Start after created*. Then **Options → Start at boot: Yes**.
+3. ✅ **Pass through the TUN device**:
    ```bash
-   pct set <CTID> --dev0 /dev/net/tun
+   pct set 104 --dev0 /dev/net/tun
    ```
    Tailscale creates a virtual network interface (`tailscale0`) through `/dev/net/tun`. An unprivileged container can't access that device by default; this line gives this container, and only this container, access to it. Same as GUI → the container → Resources → Add → Device Passthrough. It's Proxmox's native equivalent of the two raw `lxc.*` lines in Tailscale's guide.
-4. ⬜ **Base system** (start the container with `pct start <CTID>`, then `pct enter <CTID>` opens a root shell inside it):
+4. ✅ **Base system** (start the container with `pct start 104`, then `pct enter 104` opens a root shell inside it):
    ```bash
    apt update && apt full-upgrade -y
    apt install -y curl unattended-upgrades
    dpkg-reconfigure -plow unattended-upgrades
    ```
    Brings the template up to date, installs `curl` (needed in step 6) and enables automatic Debian security updates, same as VM 101. Answer **Yes** to the prompt.
-5. ⬜ **Enable IP forwarding** (inside the container):
+5. ✅ **Enable IP forwarding** (inside the container):
    ```bash
    printf 'net.ipv4.ip_forward = 1\nnet.ipv6.conf.all.forwarding = 1\n' > /etc/sysctl.d/99-tailscale.conf
    sysctl -p /etc/sysctl.d/99-tailscale.conf
    ```
    A subnet router forwards packets between `tailscale0` and the LAN interface; Linux drops forwarded packets unless forwarding is on. The file makes it permanent, `sysctl -p` applies it now. It only affects the container's own network stack, not the Proxmox host. Both lines should echo back with `= 1`.
-6. ⬜ **Install Tailscale** from the official repository (inside the container):
+6. ✅ **Install Tailscale** from the official repository (inside the container):
    ```bash
    curl -fsSL https://pkgs.tailscale.com/stable/debian/trixie.noarmor.gpg -o /usr/share/keyrings/tailscale-archive-keyring.gpg
    curl -fsSL https://pkgs.tailscale.com/stable/debian/trixie.tailscale-keyring.list -o /etc/apt/sources.list.d/tailscale.list
    apt update && apt install -y tailscale
    ```
    The first line saves Tailscale's signing key, the second adds their Debian 13 (`trixie`) repository, signed with that key, and the third installs `tailscale`/`tailscaled`. The service starts and is enabled at boot automatically. Using the repo (rather than piping `install.sh` to a shell) keeps every step visible and lets apt handle updates.
-7. ⬜ **Join the tailnet and advertise the LAN** (inside the container):
+7. ✅ **Join the tailnet and advertise the LAN** (inside the container):
    ```bash
    tailscale up --advertise-routes=192.168.0.0/24 --accept-dns=false
    tailscale set --auto-update
    ```
    `tailscale up` prints a login URL: open it on the Mac and sign in with the tailnet account. `--advertise-routes` offers the home LAN to the tailnet (it stays inactive until approved in step 8). `--accept-dns=false` keeps the container's own DNS settings instead of switching it to Tailscale's resolver — a router node doesn't need MagicDNS. SNAT stays at its default (on), and `--accept-routes` is deliberately not used (it's off by default on Linux, and a subnet router shouldn't route its own LAN through the tailnet). `tailscale set --auto-update` lets Tailscale update itself through apt.
-8. ⬜ **Admin console** ([login.tailscale.com/admin/machines](https://login.tailscale.com/admin/machines)), on the `tailscale` machine:
+8. ✅ **Admin console** ([login.tailscale.com/admin/machines](https://login.tailscale.com/admin/machines)), on the `tailscale` machine:
    - **Approve** the device (device approval from step 0).
    - **⋯ → Edit route settings** → tick `192.168.0.0/24` → Save. The machine shows a *Subnets* badge.
    - **⋯ → Disable key expiry.**
-9. ⬜ **Verify from outside**, on the phone with **Wi-Fi off** (mobile data) and Tailscale on:
+9. ✅ **Verify from outside**, on the phone with **Wi-Fi off** (mobile data) and Tailscale on:
    - Seerr `http://192.168.0.31:5055`, Radarr `:7878`, Jellyfin `http://192.168.0.30:8096`, Proxmox `https://192.168.0.2:8006` load.
    - qBittorrent `http://192.168.0.31:8080` loads: confirms SNAT works with its kill switch.
    - Inside the container: `tailscale status` lists the phone; `tailscale ping <phone-name>` shows `via <ip>:<port>` for a direct connection or `via DERP(...)` for a relayed one. `tailscale netcheck` reports the NAT type. Record which one appears (see [Known Limitations](#known-limitations) — double NAT).
    - Play a few minutes of a film in Jellyfin remotely and check it doesn't stall.
    - **Back home on Wi-Fi with Tailscale still on**: Jellyfin still plays, and `tailscale status` in the container shows no traffic from the phone — confirms local traffic isn't hairpinning through the tunnel.
-10. ⬜ **Backups**: add the container to the 05:00 job (Datacenter → Backup → Edit). After the first run, test-restore as a temporary ID **with `net0` removed** (see [Backup Requirements](#backup-requirements)), check `/var/lib/tailscale/tailscaled.state` exists, then destroy it.
-11. ⬜ **Docs**: mark Deployed in [services/README.md](../README.md); add the container to [hardware/networking.md](../../hardware/networking.md#static-ip-assignments), to *Hosted Workloads* and the backup job table in [services/proxmox.md](../proxmox.md); record the results of steps 9 and 10 here.
+   - **Result (2026-10-13, iPhone on mobile data)**: all five URLs load, qBittorrent included. **Direct connection, no DERP**: `tailscale ping` → `via <carrier-ip>:41641` in 36–43 ms. `netcheck`: UDP yes, `MappingVariesByDestIP: false` (easy NAT), port mapping available through **UPnP and NAT-PMP on the TP-Link**, nearest DERP Frankfurt (15 ms). Jellyfin played ~10 min at reduced quality without stalling (a few seconds to start). Back home on Wi-Fi with Tailscale on: the phone's `tx`/`rx` counters stayed unchanged during local Jellyfin playback, so iOS keeps local traffic off the tunnel.
+10. ✅ **Backups**: add the container to the 05:00 job (Datacenter → Backup → Edit). After the first run, test-restore as a temporary ID **with `net0` removed** (see [Backup Requirements](#backup-requirements)), check `/var/lib/tailscale/tailscaled.state` exists, then destroy it. Use the procedure in [services/proxmox.md](../proxmox.md#verification), with `pct set 900 --delete net0 --onboot 0` so the copy also can't start by itself at boot.
+   - **Result (2026-10-13)**: added to the 05:00 job. First archive taken manually (`vzdump 104 --mode stop`): 265 MB (793 MiB of data). Restored as CT 900 with `net0` removed: `tailscaled.state` present, `tailscaled` `active`; CT 900 destroyed. CT 104 still connected afterwards (`tailscale ping` to the phone OK).
+11. ✅ **Docs**: mark Deployed in [services/README.md](../README.md); add the container to [hardware/networking.md](../../hardware/networking.md#static-ip-assignments), to *Hosted Workloads* and the backup job table in [services/proxmox.md](../proxmox.md); record the results of steps 9 and 10 here.
 
 ### Rollback
 
@@ -195,6 +198,8 @@ Nothing outside the container and the Tailscale account changes, so undoing it i
 | 4 | SNAT | **On (default)**: no router change, qBittorrent kill switch keeps working | Off (LAN hosts see real Tailscale IPs, but needs a static route for `100.64.0.0/10` on the TP-Link and a `VPN_LAN_NETWORK` change) |
 | 5 | Exit node | **Not now** | Advertise as exit node so the phone can use the home connection on untrusted Wi-Fi — easy to add later with `tailscale set --advertise-exit-node` |
 | 6 | Updates | **`tailscale set --auto-update`** + Debian `unattended-upgrades` | Add Tailscale's repo to `unattended-upgrades` origins (one mechanism, but auto-update status is also visible in the admin console); manual updates |
+| 7 | UDP GRO forwarding on `eth0` (`tailscale up` warning) | **Not enabled** (2026-10-13): it only speeds up *forwarded UDP* at high rates; the services reached here are TCP (HTTP, Jellyfin), and remote speed is capped by the ISP upload and mobile link first. Revisit if the node becomes an exit node (#5: phone traffic incl. QUIC/HTTP-3 is UDP) or a direct-path transfer stalls well below the upload speed with CT 104's CPU at 100% | `ethtool -K eth0 rx-udp-gro-forwarding on rx-gro-list off` once, as a test (lost at every restart, incl. nightly `vzdump`); same command from a custom systemd unit at boot (permanent, but custom config; Tailscale's `networkd-dispatcher` method doesn't apply to the Proxmox-managed Debian CT) |
+| 8 | Port mapping (UPnP / NAT-PMP on the TP-Link) | **Kept** (2026-10-13): `tailscaled` uses it automatically; the forward is on the inner router only and accepts only WireGuard traffic. Whether to turn UPnP/NAT-PMP off on the TP-Link altogether is a separate, later decision (see [Future Work](#future-work)) | Disable Tailscale's port mapper only (strictly no forwards; direct connections likely still work with this easy NAT, untested); turn UPnP/NAT-PMP off on the TP-Link (closes a LAN-wide risk, but a router change that may affect other devices) |
 
 ---
 
@@ -205,3 +210,4 @@ Nothing outside the container and the Tailscale account changes, so undoing it i
 - **Failover subnet router** on the Synology package, if losing remote access during a Proxmox outage becomes a real problem.
 - **Exit node**, if a need for it appears.
 - **Renumber the LAN** away from `192.168.0.0/24` when VLANs are introduced, to remove the overlap limitation.
+- **UPnP / NAT-PMP on the TP-Link** (open decision): it's enabled, and lets *any* LAN device open port forwards on the TP-Link without asking, not just Tailscale. Turning it off closes that LAN-wide risk; check first whether any device relies on it, and re-run `tailscale netcheck` / `tailscale ping` afterwards to confirm connections stay direct. A router change, so decided separately from Tailscale (see [Decision Log](#decision-log) #8).

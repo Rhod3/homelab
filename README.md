@@ -25,5 +25,5 @@ The goal of this project is to start with a simple, low-cost setup and progressi
   - [services/adguard-home/README.md](services/adguard-home/README.md) - AdGuard Home local DNS (planned)
   - [services/arr-stack/README.md](services/arr-stack/README.md) - Arr stack media automation
   - [services/teslamate/README.md](services/teslamate/README.md) - TeslaMate Tesla data logger
-  - [services/tailscale/README.md](services/tailscale/README.md) - Tailscale remote access (planned)
+  - [services/tailscale/README.md](services/tailscale/README.md) - Tailscale remote access
   - [services/paperless-ngx/README.md](services/paperless-ngx/README.md) - Paperless-ngx document management (planned)

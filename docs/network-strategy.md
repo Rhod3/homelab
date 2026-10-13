@@ -160,7 +160,7 @@ Run a reverse proxy (e.g. Caddy/Traefik/Nginx Proxy Manager) on a DMZ-style netw
 
 **Recommendation**: Proposition A (VPN-only) as the default; consider Proposition B later, and only for specific low-risk services, if VPN-only proves inconvenient for non-technical household members.
 
-**Decision (2026-10-10)**: Proposition A, as a **Tailscale subnet router** in a dedicated LXC on Proxmox, advertising the current flat LAN. Status: planned — see [services/tailscale/README.md](../services/tailscale/README.md). It doesn't depend on VLANs, so it's being done ahead of Phases 1–2 below; the phases stay independent and reversible.
+**Decision (2026-10-10)**: Proposition A, as a **Tailscale subnet router** in a dedicated LXC on Proxmox, advertising the current flat LAN. Status: deployed and verified on 2026-10-13 (CT 104) — see [services/tailscale/README.md](../services/tailscale/README.md). It doesn't depend on VLANs, so it's being done ahead of Phases 1–2 below; the phases stay independent and reversible.
 
 ---
 

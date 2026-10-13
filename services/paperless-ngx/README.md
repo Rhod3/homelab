@@ -88,7 +88,7 @@ What lives where:
 
 | Port | Protocol | Service | Exposure |
 | --- | --- | --- | --- |
-| 8000 | TCP | Paperless web UI + REST API (used by the iPhone app) | LAN; remotely through Tailscale once deployed |
+| 8000 | TCP | Paperless web UI + REST API (used by the iPhone app) | LAN; remotely through Tailscale |
 | 5432 | TCP | PostgreSQL | Docker network only — not published |
 | 6379 | TCP | Valkey | Docker network only — not published |
 | 3000 | TCP | Gotenberg | Docker network only — not published |
@@ -210,14 +210,14 @@ Notes:
 - **Synology DS420+** reachable over NFS. This is a hard runtime dependency: if the NAS is down or rebooting (DSM updates), Paperless can't open documents and Docker won't start at boot (see [Known Limitations](#known-limitations)).
 - **Docker** (official repo) and image registries `ghcr.io` / Docker Hub for updates.
 - **Swift Paperless** app on the iPhone.
-- **Tailscale** (planned, see [services/tailscale/README.md](../tailscale/README.md)) for access away from home. Without it, Paperless is home-only, which is acceptable at the start.
+- **Tailscale** (deployed 2026-10-13, see [services/tailscale/README.md](../tailscale/README.md)) for access away from home. The whole LAN is routed, so Paperless is reachable remotely with no Tailscale change.
 - **Hyper Backup destination** (future) for the offsite copy.
 
 ---
 
 ## Security Considerations
 
-- **Sensitive data**: IDs, contracts, tax and medical documents. The guiding rule is **no public exposure**: no port forward, no public hostname. Remote access only through the planned Tailscale.
+- **Sensitive data**: IDs, contracts, tax and medical documents. The guiding rule is **no public exposure**: no port forward, no public hostname. Remote access only through Tailscale.
 - **Authentication**: one account per person, no shared logins. **Enable 2FA (TOTP)** on the admin account in the user profile right after the first login. The second user, if added, gets a normal account (not superuser) and sees only what is shared with them (per-document owners and permissions).
 - **Plain HTTP on the LAN**: the password and documents cross the home network unencrypted. Acceptable short-term on a trusted LAN; over Tailscale the traffic is WireGuard-encrypted anyway. HTTPS via a reverse proxy is listed in [Future Work](#future-work).
 - **Secrets stay out of the repo**: `PAPERLESS_SECRET_KEY` and `POSTGRES_PASSWORD` live only in `.env` on the VM and in the password manager. PostgreSQL, Valkey, Tika and Gotenberg are not published outside the Docker network.

@@ -20,6 +20,7 @@ Proxmox Virtual Environment (VE) serves as the core compute virtualization platf
 - **Home Assistant OS VM**: (Migration target from Synology VMM)
 - **Jellyfin**: Deployed as unprivileged LXC (CT 100) with Intel Quick Sync GPU passthrough — see [services/jellyfin/README.md](jellyfin/README.md).
 - **TeslaMate**: Deployed as unprivileged LXC (CT 102, `192.168.0.32`) from the community-scripts TeslaMate script — see [services/teslamate/README.md](teslamate/README.md).
+- **Tailscale subnet router**: Deployed as unprivileged LXC (CT 104 `tailscale`, `192.168.0.34`, Debian 13, `/dev/net/tun` passed through) for remote access to the LAN — see [services/tailscale/README.md](tailscale/README.md).
 - **Future services** (MQTT/Zigbee2MQTT, AdGuard Home, Immich, Paperless-ngx, etc.): each deployed as its own dedicated LXC or VM, sized and provisioned individually rather than consolidated into a shared container host — see [services/README.md](README.md#service-status-matrix) for current status.
 - **Arr Stack Docker VM** (deployed, VM 101 `arr-stack`, `192.168.0.31`, Debian 13 from the cloud image + cloud-init): the one deliberate exception to the rule above — a single Debian VM running Docker Compose for Prowlarr, Radarr, Sonarr, qBittorrent, and related apps. Justified because the stack is one logical service: the apps must share a single filesystem for hardlinks, are wired together by API keys, and are deployed and updated together. A VM rather than LXC(s) because the apps need **read/write** NFS access, which unprivileged LXCs can't mount (see below) and which the host-bind-mount workaround complicates with UID shifting. This is not a general-purpose Docker host; other services still get their own LXC/VM. See [services/arr-stack/README.md](arr-stack/README.md).
 
@@ -68,7 +69,7 @@ Scheduled `vzdump` jobs, configured under **Datacenter → Backup** and written 
 | Setting | Value | Notes |
 | --- | --- | --- |
 | Node | `pve` | |
-| Guests | CT 100 (Jellyfin), VM 101 (arr stack, first archive 2026-09-30), CT 102 (TeslaMate, added 2026-10-03) | Home Assistant is deliberately excluded — it uses its own app-level backups. VM 101 was added to this job rather than given its own `snapshot` job: one tested job to maintain, and a clean shutdown keeps the arr apps' SQLite DBs consistent; downloads just pause for ~1 min and the VPN reconnects |
+| Guests | CT 100 (Jellyfin), VM 101 (arr stack, first archive 2026-09-30), CT 102 (TeslaMate, added 2026-10-03), CT 104 (Tailscale, added 2026-10-13) | Home Assistant is deliberately excluded — it uses its own app-level backups. VM 101 was added to this job rather than given its own `snapshot` job: one tested job to maintain, and a clean shutdown keeps the arr apps' SQLite DBs consistent; downloads just pause for ~1 min and the VPN reconnects |
 | Storage | `nas-backups` | |
 | Mode | `stop` | Clean shutdown before the archive is taken, so Jellyfin's SQLite DB is consistent rather than crash-consistent. Costs ~30 s of downtime per run |
 | Compression | ZSTD | |
@@ -109,6 +110,7 @@ Set in `/etc/vzdump.conf` on `pve`. It is required for backing up **unprivileged
   Expected noise: with no network, apps log connection errors, e.g. Jellyfin's plugin repository check throws an `HttpClient` stack trace. This is harmless.
 - **VM 101 (arr stack)**: nightly archives present since 2026-09-30 (`pvesm list nas-backups --vmid 101`), ~2.8 GB each once the stack was configured. Only the VM's own disk is captured — the `/data` NFS mount of the `tv` share is not a VM disk, so media is never included. The 05:00 shutdown/restart was confirmed harmless: the NFS mount, all containers and the VPN tunnel came back on their own. A test restore has not been done yet — see [services/arr-stack/README.md](arr-stack/README.md#future-work).
 - **CT 102 (TeslaMate)**: first archive 2026-10-03 (5.0 GiB of container data). Test restore passed the same day with the procedure above: all services active and the PostgreSQL data queryable — see [services/teslamate/README.md](teslamate/README.md#deployment-steps).
+- **CT 104 (Tailscale)**: first archive 2026-10-13, taken manually (265 MB, 793 MiB of container data). Test restore passed the same day with the procedure above, plus `--onboot 0` on CT 900: `/var/lib/tailscale/tailscaled.state` present and `tailscaled` active. Removing `net0` is essential here — the copy holds the live node's key and would fight CT 104 for its place in the tailnet — see [services/tailscale/README.md](tailscale/README.md#backup-requirements).
 
 ---
 
